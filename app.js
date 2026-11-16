@@ -31,7 +31,8 @@ const fmtPrice = n => { const v = Number(n || 0); return '$' + (Number.isInteger
 const S = {
   session: null, me: null, biz: null, members: [], clients: [], jobs: [], todayJobs: [], bills: [],
   tab: 'today', day: ymd(new Date()), week: ymd(weekStart(new Date())), who: 'all', filter: 'all', q: '',
-  modal: null, form: {}, authMode: 'in', loading: true, toast: ''
+  modal: null, form: {}, authMode: 'in', loading: true, toast: '',
+  entries: [], openEntry: null, pay: [], hoursWeek: ymd(weekStart(new Date())), hoursWho: null
 };
 const isOwner = () => S.me && S.me.role === 'owner';
 const member = id => S.members.find(m => m.user_id === id);
@@ -44,6 +45,7 @@ const I = {
   cal: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10 H21 M8 3 V7 M16 3 V7"/></svg>`,
   bill: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3 H18 V21 L15 19 L12 21 L9 19 L6 21 Z"/><path d="M9 8 H15 M9 12 H15"/></svg>`,
   people: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20 C3.5 15.5 14.5 15.5 15.5 20"/><path d="M16 4.5 A3.5 3.5 0 0 1 16 11.5"/><path d="M18 15 C20 15.8 21.2 17.5 21.5 20"/></svg>`,
+  clock: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7 V12 L15.5 14"/></svg>`,
   me: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C5 15.5 19 15.5 20 21"/></svg>`,
   send: c => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3 L10 14"/><path d="M21 3 L14 21 L10 14 L3 10 Z"/></svg>`,
   plus: c => `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>`,
@@ -94,11 +96,37 @@ async function refresh() {
     sb.from('jobs').select('*').gte('job_date', ymd(ws)).lte('job_date', ymd(addDays(ws, 6))).order('job_date').order('start_time'),
     sb.from('jobs').select('*').eq('job_date', ymd(new Date())).order('start_time')
   ];
-  if (isOwner()) q.push(sb.from('bills').select('*').order('sent_at', { ascending: false }).limit(1000));
+  const hw = parseYmd(S.hoursWeek);
+  q.push(sb.from('time_entries').select('*').gte('clock_in', hw.toISOString()).lt('clock_in', addDays(hw, 7).toISOString()).order('clock_in'));
+  q.push(sb.from('time_entries').select('*').eq('user_id', S.me.user_id).is('clock_out', null).limit(1));
+  if (isOwner()) { q.push(sb.from('bills').select('*').order('sent_at', { ascending: false }).limit(1000)); q.push(sb.from('member_pay').select('*')); }
   const r = await Promise.all(q);
   if (r.some(x => x.error)) toast(t('errGeneric'));
   S.members = r[0].data || []; S.clients = r[1].data || []; S.jobs = r[2].data || []; S.todayJobs = r[3].data || [];
-  S.bills = (r[4] && r[4].data) || [];
+  S.entries = r[4].data || []; S.openEntry = (r[5].data || [])[0] || null;
+  S.bills = (r[6] && r[6].data) || []; S.pay = (r[7] && r[7].data) || [];
+}
+async function loadEntries() {
+  const hw = parseYmd(S.hoursWeek);
+  const { data } = await sb.from('time_entries').select('*').gte('clock_in', hw.toISOString()).lt('clock_in', addDays(hw, 7).toISOString()).order('clock_in');
+  S.entries = data || [];
+}
+// ---------- hours ----------
+const entryHours = e => Math.max(0, ((e.clock_out ? new Date(e.clock_out) : new Date()) - new Date(e.clock_in)) / 36e5);
+const fmtHM = h => { const m = Math.round(h * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
+const rateOf = id => Number((S.pay.find(p => p.user_id === id) || {}).hourly_rate || 0);
+const fmtClock = s => new Date(s).toLocaleTimeString(loc(), { hour: 'numeric', minute: '2-digit' });
+const toLocalInput = s => { if (!s) return ''; const d = new Date(s); return `${ymd(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function clockCard() {
+  const o = S.openEntry;
+  if (o) return `<div class="card col" style="background:#E7F7EF;border-color:#A9DFC3;padding:16px">
+    <div class="between"><span class="chip c-paid">● ${t('clockedIn')}</span><span class="muted small">${t('since')} ${esc(fmtClock(o.clock_in))}</span></div>
+    <div class="h" style="font-size:40px;line-height:1" id="clockTimer">${fmtHM(entryHours(o))}</div>
+    <button class="big ghost" data-act="clockOut">${t('clockOut')}</button></div>`;
+  const mineWeek = S.entries.filter(e => e.user_id === S.me.user_id).reduce((x, e) => x + entryHours(e), 0);
+  return `<div class="card col" style="padding:16px">
+    <div class="between"><b>${t('timeClock')}</b><span class="muted small">${t('thisWeek')}: ${fmtHM(mineWeek)}</span></div>
+    <button class="big tealbtn" data-act="clockIn">${t('clockIn')}</button></div>`;
 }
 
 // ---------- views ----------
@@ -138,8 +166,8 @@ function viewOnboard() {
 }
 function tabs() {
   const list = isOwner()
-    ? [['today', I.house('currentColor'), t('tToday')], ['schedule', I.cal, t('tSchedule')], ['bills', I.bill, t('tBills')], ['clients', I.people, t('tClients')], ['me', I.me, t('tMe')]]
-    : [['today', I.house('currentColor'), t('tToday')], ['schedule', I.cal, t('tSchedule')], ['me', I.me, t('tMe')]];
+    ? [['today', I.house('currentColor'), t('tToday')], ['schedule', I.cal, t('tSchedule')], ['bills', I.bill, t('tBills')], ['hours', I.clock, t('tHours')], ['clients', I.people, t('tClients')], ['me', I.me, t('tMe')]]
+    : [['today', I.house('currentColor'), t('tToday')], ['schedule', I.cal, t('tSchedule')], ['hours', I.clock, t('tHours')], ['me', I.me, t('tMe')]];
   const rep = S.bills.filter(b => b.status === 'reported').length;
   return `<nav class="tabs" aria-label="Main"><div class="in2" style="--n:${list.length}">${list.map(([k, ic, l]) =>
     `<button class="${S.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${ic}${l}${k === 'bills' && rep ? `<span class="badge">${rep}</span>` : ''}</button>`).join('')}</div></nav>`;
@@ -170,6 +198,7 @@ function viewToday() {
   <div class="between"><div class="h" style="font-size:28px">Limpi<span class="pink">empo</span></div>
     <div aria-hidden="true" class="av" style="width:44px;height:44px;border-radius:22px;background:${esc(S.me.color)};font-size:18px">${esc((S.me.name || '?')[0].toUpperCase())}</div></div>
   <div><h1 class="h" style="font-size:30px">${esc(t('hola', S.me.name))}</h1><p class="muted" style="margin:2px 0 0;font-size:16px">${mine.length ? t('jobsToday', mine.length) : t('noJobsToday')}</p></div>
+  ${clockCard()}
   ${isOwner() ? `<button data-act="tab" data-v="bills" style="text-align:left;border:none;background:var(--teal);border-radius:24px;padding:20px;color:#fff;position:relative;overflow:hidden">${sparkle}
     <span style="display:block;font-size:14px;font-weight:700;color:#D3F5F3">${t('paidWeek')}</span>
     <span class="h" style="display:block;font-size:42px;line-height:1">${money0(tt.pS)}</span>
@@ -231,6 +260,30 @@ function viewClients() {
     return `<button class="card row" data-act="editClient" data-v="${c.id}"><div class="ico" style="border-radius:22px;background:#F3ECF9;color:#5B3B8C">${esc((c.name || '?')[0].toUpperCase())}</div>
       <div class="grow"><div style="font-weight:800">${esc(c.name)}</div><div class="muted small">${esc(c.address || c.phone || '')}</div><div class="muted small">${t('paidSoFar')}: ${money0(paid)}</div></div>
       ${owe ? `<span class="chip c-wait">${t('owes')} ${money0(owe)}</span>` : ''}</button>`; }).join('') : `<div class="card muted center" style="padding:22px">${t('noClients')}</div>`}</div>
+</div>`;
+}
+function viewHours() {
+  const ws = parseYmd(S.hoursWeek); const we = addDays(ws, 6);
+  const people = isOwner() ? S.members.filter(m => m.active || S.entries.some(e => e.user_id === m.user_id)) : S.members.filter(m => m.user_id === S.me.user_id);
+  const rows = people.map(m => { const es = S.entries.filter(e => e.user_id === m.user_id); const h = es.reduce((x, e) => x + entryHours(e), 0); return { m, es, h, rate: rateOf(m.user_id), pay: h * rateOf(m.user_id), open: es.some(e => !e.clock_out) }; });
+  const totH = rows.reduce((x, r) => x + r.h, 0), totP = rows.reduce((x, r) => x + r.pay, 0);
+  const entryRow = e => `<${isOwner() ? 'button' : 'div'} class="between" style="width:100%;border:none;background:none;padding:8px 0;border-top:1px solid var(--line);text-align:left;font-size:15px" ${isOwner() ? `data-act="editEntry" data-v="${e.id}"` : ''}>
+      <span><b>${esc(fmtDate(new Date(e.clock_in)))}</b><br><span class="muted small">${esc(fmtClock(e.clock_in))} – ${e.clock_out ? esc(fmtClock(e.clock_out)) : t('now')}${e.edited ? ' · ' + t('edited') : ''}</span></span>
+      <span style="font-weight:800${e.clock_out ? '' : ';color:#136C43'}">${fmtHM(entryHours(e))}</span></${isOwner() ? 'button' : 'div'}>`;
+  return `<div class="pad" style="gap:14px">
+  <div class="between"><h1 class="h" style="font-size:30px">${t('hours')}</h1>
+    <div class="row" style="gap:4px"><button class="x" aria-label="Previous week" data-act="hoursWeek" data-v="-1">‹</button><button class="x" aria-label="Next week" data-act="hoursWeek" data-v="1">›</button></div></div>
+  <div class="muted small" style="margin-top:-8px;font-weight:700">${esc(fmtDate(ws, { month: 'short', day: 'numeric' }))} – ${esc(fmtDate(we, { month: 'short', day: 'numeric' }))}</div>
+  ${isOwner() ? `<div class="stats" style="grid-template-columns:repeat(2,1fr)"><div class="stat c-rep"><small>${t('totalHours')}</small><b>${fmtHM(totH)}</b></div><div class="stat c-paid"><small>${t('totalPay')}</small><b>${money(totP)}</b></div></div>` : ''}
+  <div class="col">${rows.map(r => `<div class="card col" style="gap:6px">
+    <button class="between" style="width:100%;border:none;background:none;padding:0;text-align:left" data-act="hoursWho" data-v="${r.m.user_id}" aria-expanded="${S.hoursWho === r.m.user_id || !isOwner()}">
+      <span class="row" style="gap:10px">${av(r.m.user_id)}<span><b style="font-size:16px">${esc(r.m.name)}</b>${r.open ? ` <span class="chip c-paid" style="padding:2px 8px;font-size:11px">${t('clockedIn')}</span>` : ''}<br>
+        ${isOwner() ? `<span class="muted small">${r.rate ? t('perHour', money(r.rate)) : t('noRate')}</span>` : ''}</span></span>
+      <span style="text-align:right"><span class="h" style="font-size:20px">${fmtHM(r.h)}</span>${isOwner() ? `<br><b class="small" style="color:#136C43">${money(r.pay)}</b>` : ''}</span></button>
+    ${(S.hoursWho === r.m.user_id || !isOwner()) ? `<div>${r.es.length ? r.es.map(entryRow).join('') : `<div class="muted small" style="padding:8px 0">${t('noHours')}</div>`}</div>
+      ${isOwner() ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="pill" data-act="editRate" data-v="${r.m.user_id}">${t('setRate')}</button><button class="pill" data-act="addEntry" data-v="${r.m.user_id}">${t('addHours')}</button></div>` : ''}` : ''}
+  </div>`).join('') || `<div class="card muted center" style="padding:22px">${t('noHours')}</div>`}</div>
+  ${isOwner() ? `<p class="muted small" style="margin:0">${t('hoursTip')}</p><button class="big ghost" style="font-size:16px" data-act="exportHours">${t('exportCsv')}</button>` : ''}
 </div>`;
 }
 function viewMe() {
@@ -402,7 +455,26 @@ function modalPrices() {
   <button class="big pinkbtn" data-act="savePrices">${t('save')}</button>
   <button class="link" data-act="closeModal">${t('cancel')}</button>`;
 }
-const MODALS = { prices: modalPrices, job: modalJob, bill: modalBill, sent: modalSent, billDetail: modalBillDetail, client: modalClient, newpass: modalNewPass };
+function modalEntry() {
+  const f = S.form; const m = member(f.user_id) || {};
+  return `<h2 class="h" style="font-size:24px">${f.id ? t('fixHours') : t('addHours')}</h2>
+  <div class="row" style="gap:10px">${av(f.user_id)}<b>${esc(m.name || '')}</b></div>
+  <label class="f">${t('clockInAt')}<input class="in" type="datetime-local" data-bind="clock_in" value="${esc(f.clock_in)}"></label>
+  <label class="f">${t('clockOutAt')}<input class="in" type="datetime-local" data-bind="clock_out" value="${esc(f.clock_out)}"></label>
+  <label class="f">${t('notes')}<input class="in" data-bind="note" value="${esc(f.note)}"></label>
+  <button class="big pinkbtn" data-act="saveEntry">${t('save')}</button>
+  <div class="between">${f.id ? `<button class="dangerlink" data-act="deleteEntry">${t('delete')}</button>` : '<span></span>'}<button class="link" data-act="closeModal">${t('cancel')}</button></div>`;
+}
+function modalRate() {
+  const f = S.form; const m = member(f.user_id) || {};
+  return `<h2 class="h" style="font-size:24px">${t('setRate')}</h2>
+  <div class="row" style="gap:10px">${av(f.user_id)}<b>${esc(m.name || '')}</b></div>
+  <label class="f">${t('hourlyRate')}<input class="in" type="number" inputmode="decimal" min="0" step="0.25" data-bind="rate" value="${esc(f.rate)}" placeholder="${t('eg')} 18"></label>
+  <p class="muted small" style="margin:0">${t('rateNote')}</p>
+  <button class="big pinkbtn" data-act="saveRate">${t('save')}</button>
+  <button class="link" data-act="closeModal">${t('cancel')}</button>`;
+}
+const MODALS = { entry: modalEntry, rate: modalRate, prices: modalPrices, job: modalJob, bill: modalBill, sent: modalSent, billDetail: modalBillDetail, client: modalClient, newpass: modalNewPass };
 
 // ---------- render ----------
 function render() {
@@ -415,7 +487,7 @@ function render() {
   if (S.loading) html = `<div class="spinner" role="status" aria-label="${t('loading')}"></div>`;
   else if (!S.session) html = viewAuth();
   else if (!S.me) html = viewOnboard();
-  else html = ({ today: viewToday, schedule: viewSchedule, bills: viewBills, clients: viewClients, me: viewMe }[S.tab] || viewToday)() + tabs();
+  else html = ({ today: viewToday, schedule: viewSchedule, bills: viewBills, hours: viewHours, clients: viewClients, me: viewMe }[S.tab] || viewToday)() + tabs();
   if (S.modal && MODALS[S.modal.type]) html += `<div class="overlay" data-act="overlay"><div class="sheet" role="dialog" aria-modal="true">${MODALS[S.modal.type]()}</div></div>`;
   if (S.toast) html += `<div class="toast" role="status">${esc(S.toast)}</div>`;
   app.innerHTML = `<div class="wrap">${html}</div>`;
@@ -556,6 +628,42 @@ async function act(a, el) {
       const m = member(v); const { error } = await sb.from('members').update({ active: !m.active }).eq('user_id', v);
       if (!error) m.active = !m.active; break;
     }
+    case 'clockIn': {
+      const { error } = await sb.rpc('clock_in'); if (error) { toast(/already/i.test(error.message) ? t('alreadyIn') : t('errGeneric')); }
+      await refresh(); if (!error) toast(t('clockedInToast')); break;
+    }
+    case 'clockOut': {
+      const { error } = await sb.rpc('clock_out'); if (error) toast(t('errGeneric'));
+      const h = S.openEntry ? entryHours(S.openEntry) : 0; await refresh(); if (!error) toast(t('clockedOutToast', fmtHM(h))); break;
+    }
+    case 'hoursWeek': S.hoursWeek = ymd(addDays(parseYmd(S.hoursWeek), Number(v) * 7)); await loadEntries(); break;
+    case 'hoursWho': S.hoursWho = S.hoursWho === v ? null : v; break;
+    case 'editEntry': { const e = S.entries.find(x => x.id === v); S.form = { id: e.id, user_id: e.user_id, clock_in: toLocalInput(e.clock_in), clock_out: toLocalInput(e.clock_out), note: e.note || '' }; S.modal = { type: 'entry' }; break; }
+    case 'addEntry': { const d = parseYmd(S.hoursWeek); const day = ymd(new Date()) >= S.hoursWeek && ymd(new Date()) <= ymd(addDays(d, 6)) ? ymd(new Date()) : S.hoursWeek; S.form = { id: null, user_id: v, clock_in: day + 'T09:00', clock_out: day + 'T15:00', note: '' }; S.modal = { type: 'entry' }; break; }
+    case 'saveEntry': {
+      const f = S.form; if (!f.clock_in) { toast(t('clockInAt') + '?'); return; }
+      const ci = new Date(f.clock_in), co = f.clock_out ? new Date(f.clock_out) : null;
+      if (co && co <= ci) { toast(t('outAfterIn')); return; }
+      const row = { business_id: S.me.business_id, user_id: f.user_id, clock_in: ci.toISOString(), clock_out: co ? co.toISOString() : null, note: f.note || '', edited: true };
+      const { error } = f.id ? await sb.from('time_entries').update(row).eq('id', f.id) : await sb.from('time_entries').insert(row);
+      if (error) { toast(t('errGeneric')); return; }
+      S.hoursWeek = ymd(weekStart(ci)); S.modal = null; await refresh(); toast(t('saved')); break;
+    }
+    case 'deleteEntry': { if (!window.confirm(t('confirmDelete'))) return; await sb.from('time_entries').delete().eq('id', S.form.id); S.modal = null; await refresh(); break; }
+    case 'editRate': S.form = { user_id: v, rate: rateOf(v) || '' }; S.modal = { type: 'rate' }; break;
+    case 'saveRate': {
+      const r = Math.max(0, Number(S.form.rate) || 0);
+      const { error } = await sb.from('member_pay').upsert({ user_id: S.form.user_id, business_id: S.me.business_id, hourly_rate: r }, { onConflict: 'user_id' });
+      if (error) { toast(t('errGeneric')); return; } S.modal = null; await refresh(); toast(t('saved')); break;
+    }
+    case 'exportHours': {
+      const ws = parseYmd(S.hoursWeek);
+      const rows = [['Name', 'Date', 'Clock in', 'Clock out', 'Hours', 'Rate', 'Pay', 'Edited', 'Note']].concat(S.entries.map(e => { const m = member(e.user_id) || {}; const h = entryHours(e); return [m.name || '', ymd(new Date(e.clock_in)), fmtClock(e.clock_in), e.clock_out ? fmtClock(e.clock_out) : '', h.toFixed(2), rateOf(e.user_id).toFixed(2), (h * rateOf(e.user_id)).toFixed(2), e.edited ? 'yes' : '', e.note || '']; }));
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const aEl = document.createElement('a'); aEl.href = url; aEl.download = `limpiempo-hours-${ymd(ws)}.csv`; document.body.appendChild(aEl); aEl.click(); aEl.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000); return;
+    }
     default: return;
   }
   render();
@@ -631,6 +739,7 @@ document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') on
     if ((session && session.user.id) !== had) setTimeout(loadMe, 0);
   });
   await loadMe();
+  setInterval(() => { const el = document.getElementById('clockTimer'); if (el && S.openEntry) el.textContent = fmtHM(entryHours(S.openEntry)); }, 30000);
   document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && S.me && !S.modal) { await refresh(); render(); } });
 })();
 })();
