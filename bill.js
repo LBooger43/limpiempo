@@ -104,7 +104,7 @@ document.addEventListener('click', async e => {
   }
   render();
 });
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 (async function () {
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();

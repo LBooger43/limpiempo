@@ -488,6 +488,7 @@ function render() {
   else if (!S.session) html = viewAuth();
   else if (!S.me) html = viewOnboard();
   else html = ({ today: viewToday, schedule: viewSchedule, bills: viewBills, hours: viewHours, clients: viewClients, me: viewMe }[S.tab] || viewToday)() + tabs();
+  if (S.me && !S.loading) html += `<button class="fab-refresh" data-act="hardRefresh" aria-label="${t('refresh')}" title="${t('refresh')}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 A8 8 0 1 1 17.7 6.3"/><path d="M20 4 V9 H15"/></svg></button>`;
   if (S.modal && MODALS[S.modal.type]) html += `<div class="overlay" data-act="overlay"><div class="sheet" role="dialog" aria-modal="true">${MODALS[S.modal.type]()}</div></div>`;
   if (S.toast) html += `<div class="toast" role="status">${esc(S.toast)}</div>`;
   app.innerHTML = `<div class="wrap">${html}</div>`;
@@ -507,6 +508,7 @@ async function act(a, el) {
   const v = el.dataset.v;
   switch (a) {
     case 'noop': return;
+    case 'hardRefresh': { el.classList.add('spin'); location.replace(location.pathname + '?r=' + Date.now()); return; }
     case 'lang': lang = v; setLang(v); break;
     case 'authMode': S.authMode = S.authMode === 'in' ? 'up' : 'in'; break;
     case 'forgot': {
@@ -727,7 +729,7 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 async function checkVersion() {
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();

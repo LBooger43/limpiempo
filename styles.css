@@ -74,3 +74,6 @@ textarea.in{resize:vertical;min-height:70px}
 .tip b{display:block;font-family:'Baloo 2',sans-serif;font-size:18px;line-height:1.1}
 .tip small{display:block;font-size:12px;font-weight:700}
 .conf{position:absolute;display:block;pointer-events:none}
+.fab-refresh{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:25;width:46px;height:46px;border-radius:23px;border:2px solid var(--line2);background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(42,31,61,.15)}
+@media (min-width:600px){.fab-refresh{right:calc(50% - 264px)}}
+.fab-refresh.spin svg{animation:spin .8s linear infinite}
