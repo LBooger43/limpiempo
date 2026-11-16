@@ -53,7 +53,7 @@ window.I18N = {
     clientName: 'Client name', forgot: 'Forgot password?', resetSent: 'Check your email for a reset link.', newPassword: 'Choose a new password',
     codeNotFound: 'That team code wasn’t found. Check it with your boss.',
     p_standard: 'Standard clean', p_deep: 'Deep clean', p_move: 'Move-out clean', p_fridge: 'Inside fridge', p_oven: 'Inside oven', p_windows: 'Windows', p_laundry: 'Laundry',
-    bp_choose: 'Choose how you paid'
+    bp_choose: 'Choose how you paid', bp_receipt: 'Receipt', bp_textBiz: n => `Text ${n}`, bp_canClose: 'All done — you can close this page. Keep the link to see your receipt anytime.'
   },
   es: {
     appName: 'Limpiempo',
@@ -108,7 +108,7 @@ window.I18N = {
     clientName: 'Nombre del cliente', forgot: '¿Olvidaste tu contraseña?', resetSent: 'Revisa tu correo para cambiar la contraseña.', newPassword: 'Elige una contraseña nueva',
     codeNotFound: 'No encontramos ese código. Confírmalo con tu jefa.',
     p_standard: 'Limpieza estándar', p_deep: 'Limpieza profunda', p_move: 'Limpieza de mudanza', p_fridge: 'Dentro del refri', p_oven: 'Dentro del horno', p_windows: 'Ventanas', p_laundry: 'Lavar ropa',
-    bp_choose: 'Elija cómo pagó'
+    bp_choose: 'Elija cómo pagó', bp_receipt: 'Recibo', bp_textBiz: n => `Enviar texto a ${n}`, bp_canClose: 'Listo — puede cerrar esta página. Guarde el enlace para ver su recibo cuando quiera.'
   }
 };
 window.getLang = function () {

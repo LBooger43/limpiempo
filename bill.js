@@ -17,13 +17,23 @@ const initial = n => esc((n || '?').trim()[0] || '?').toUpperCase();
 
 function thanks(msg, amount) {
   const b = S.bill;
-  return `<div class="pad" style="align-items:center;justify-content:center;text-align:center;position:relative;min-height:90vh">${conf()}
-    <div style="position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px">${langSeg()}</div>
-    <div style="width:108px;height:108px;border-radius:54px;background:var(--tealL);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px #D3F5F3"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 L10 17.5 L19 7"/></svg></div>
-    <h1 class="h" style="font-size:42px;margin-top:12px">${t('bp_thanks')}</h1>
-    ${amount ? `<div class="h" style="font-size:26px;color:var(--teal)">${money(amount)}</div>` : ''}
+  const how = b.status === 'paid' ? b.method : b.reported_method;
+  const phone = String(b.business_phone || '').replace(/[^\d+]/g, '');
+  return `<div class="pad" style="align-items:center;text-align:center;position:relative;padding-bottom:40px">${conf()}
+    <div style="align-self:flex-end">${langSeg()}</div>
+    <div style="width:96px;height:96px;border-radius:48px;background:var(--tealL);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px #D3F5F3;margin-top:8px"><svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 L10 17.5 L19 7"/></svg></div>
+    <h1 class="h" style="font-size:40px;margin-top:8px">${t('bp_thanks')}</h1>
     <p class="muted" style="margin:0;font-size:17px;max-width:320px">${esc(msg)}</p>
-    <p class="muted small">${esc(b.business)}</p>
+    <div class="card col" style="width:100%;text-align:left;gap:8px;padding:16px">
+      <div class="between"><b>${t('bp_receipt')}</b><span class="muted small">${esc(b.business)}</span></div>
+      ${(b.items || []).map(i => `<div class="between" style="font-size:15px"><span>${esc(i.label)}</span><span>${money(i.amount)}</span></div>`).join('')}
+      ${Number(b.tip) ? `<div class="between" style="font-size:15px"><span>${t('tip')}</span><span>${money(b.tip)}</span></div>` : ''}
+      <div style="border-top:2px dashed var(--line)"></div>
+      <div class="between"><b>${t('bp_total')}</b><span class="h" style="font-size:26px;color:var(--teal)">${money(amount)}</span></div>
+      ${how ? `<div class="between muted small"><span>${t('bp_paidWith')}</span><b>${esc(t('m_' + how))}</b></div>` : ''}
+    </div>
+    ${phone ? `<a class="big ghost" style="font-size:17px" href="sms:${esc(phone)}">${esc(t('bp_textBiz', b.business))}</a>` : ''}
+    <p class="muted small" style="margin:0">${t('bp_canClose')}</p>
   </div>`;
 }
 function view() {
