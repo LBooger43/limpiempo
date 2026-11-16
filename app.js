@@ -244,11 +244,11 @@ function viewMe() {
     <label class="f">${t('bizName')}<input class="in" id="bz_name" value="${esc(S.biz.name)}" required></label>
     <label class="f">${t('phone')}<input class="in" id="bz_phone" value="${esc(S.biz.phone)}" inputmode="tel"></label>
     <div style="font-weight:800">${t('payLinks')}</div><div class="muted small" style="margin-top:-6px">${t('payLinksD')}</div>
-    <label class="f">${t('pl_venmo')}<input class="in" id="bz_venmo" value="${esc(S.biz.pay_venmo)}" placeholder="@rosa-cleaning" autocapitalize="off"></label>
-    <label class="f">${t('pl_cashapp')}<input class="in" id="bz_cashapp" value="${esc(S.biz.pay_cashapp)}" placeholder="$rosacleaning" autocapitalize="off"></label>
-    <label class="f">${t('pl_zelle')}<input class="in" id="bz_zelle" value="${esc(S.biz.pay_zelle)}" placeholder="(919) 555-0100" autocapitalize="off"></label>
-    <label class="f">${t('pl_applecash')}<input class="in" id="bz_applecash" value="${esc(S.biz.pay_applecash)}" placeholder="(919) 555-0100" inputmode="tel"></label>
-    <label class="f">${t('pl_paypal')}<input class="in" id="bz_paypal" value="${esc(S.biz.pay_paypal)}" placeholder="rosacleaning" autocapitalize="off"></label>
+    <label class="f">${t('pl_venmo')}<input class="in" id="bz_venmo" value="${esc(S.biz.pay_venmo)}" placeholder="${t('eg')} @rosa-cleaning" autocapitalize="off"></label>
+    <label class="f">${t('pl_cashapp')}<input class="in" id="bz_cashapp" value="${esc(S.biz.pay_cashapp)}" placeholder="${t('eg')} $rosacleaning" autocapitalize="off"></label>
+    <label class="f">${t('pl_zelle')}<input class="in" id="bz_zelle" value="${esc(S.biz.pay_zelle)}" placeholder="${t('eg')} (919) 555-0100" autocapitalize="off"></label>
+    <label class="f">${t('pl_applecash')}<input class="in" id="bz_applecash" value="${esc(S.biz.pay_applecash)}" placeholder="${t('eg')} (919) 555-0100" inputmode="tel"></label>
+    <label class="f">${t('pl_paypal')}<input class="in" id="bz_paypal" value="${esc(S.biz.pay_paypal)}" placeholder="${t('eg')} rosacleaning" autocapitalize="off"></label>
     <label class="f">${t('payInstr')}<textarea class="in" id="bz_pay" rows="2">${esc(S.biz.pay_instructions)}</textarea><span class="muted small" style="font-weight:600">${t('payInstrD')}</span></label>
     <button class="big tealbtn" type="submit" style="font-size:17px;min-height:50px">${t('save')}</button>
   </form>
