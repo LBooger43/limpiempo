@@ -23,6 +23,8 @@ const total = b => Number(b.subtotal) + Number(b.tip || 0);
 const handle = v => String(v || '').trim().replace(/\/+$/, '').split('/').pop().replace(/^[@$]+/, '').replace(/[^A-Za-z0-9_.-]/g, '');
 const METHODS = ['cash', 'zelle', 'venmo', 'applecash', 'cashapp', 'check', 'card', 'other'];
 const PRESETS = [['p_standard', 140], ['p_deep', 220], ['p_move', 300], ['p_fridge', 25], ['p_oven', 25], ['p_windows', 40], ['p_laundry', 20]];
+const services = () => (S.biz && Array.isArray(S.biz.services) && S.biz.services.length) ? S.biz.services : PRESETS.map(([k, p]) => ({ label: t(k), amount: p }));
+const fmtPrice = n => { const v = Number(n || 0); return '$' + (Number.isInteger(v) ? v : v.toFixed(2)); };
 
 const S = {
   session: null, me: null, biz: null, members: [], clients: [], jobs: [], todayJobs: [], bills: [],
@@ -253,6 +255,10 @@ function viewMe() {
     <button class="big tealbtn" type="submit" style="font-size:17px;min-height:50px">${t('save')}</button>
   </form>
   <div class="card col" style="padding:16px">
+    <div class="between"><h2 class="h" style="font-size:20px">${t('myPrices')}</h2><button class="pill" data-act="editPrices">${t('edit')}</button></div>
+    ${services().map(s => `<div class="between" style="font-size:15px"><span>${esc(s.label)}</span><b>${fmtPrice(s.amount)}</b></div>`).join('')}
+  </div>
+  <div class="card col" style="padding:16px">
     <h2 class="h" style="font-size:20px">${t('team')}</h2>
     <div class="between"><span class="muted" style="font-weight:800">${t('joinCodeLbl')}</span><span class="h" style="font-size:30px;letter-spacing:.12em">${esc(S.biz.join_code)}</span></div>
     <a class="big sunbtn" style="font-size:17px" href="${esc(smsHref('', inviteBody))}">${I.send('#2A1F3D')}${t('inviteCrew')}</a>
@@ -288,7 +294,8 @@ function modalBill() {
   <label class="f">${t('billTo')}<select class="in" data-bind="client_id"><option value="">${t('chooseClient')}</option>${S.clients.map(c => `<option value="${c.id}" ${f.client_id === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
   <button class="link" style="align-self:flex-start;padding:0" data-act="addClient" data-back="bill">${t('newClient')}</button>
   <div class="f" style="font-weight:800;font-size:14px">${t('quickAdd')}</div>
-  <div class="row" style="flex-wrap:wrap;gap:8px">${PRESETS.map(([k, p], i) => `<button class="pill" data-act="preset" data-v="${i}">+ ${t(k)} $${p}</button>`).join('')}</div>
+  <div class="row" style="flex-wrap:wrap;gap:8px">${services().map((s, i) => `<button class="pill" data-act="preset" data-v="${i}">+ ${esc(s.label)} ${fmtPrice(s.amount)}</button>`).join('')}</div>
+  <button class="link" style="align-self:flex-start;padding:0" data-act="editPrices" data-back="bill">${t('editPrices')}</button>
   <div class="col" style="gap:8px">${f.items.map((it, i) => `<div class="lineitem">
     <input class="in" aria-label="${t('item')}" placeholder="${t('item')}" data-bind="items.${i}.label" value="${esc(it.label)}">
     <input class="in" aria-label="${t('amount')}" placeholder="$" type="number" inputmode="decimal" min="0" step="0.01" data-bind="items.${i}.amount" value="${esc(it.amount)}">
@@ -363,7 +370,19 @@ function modalNewPass() {
   <form data-form="newpass" class="col"><input class="in" id="np_pass" type="password" minlength="6" autocomplete="new-password" required>
   <button class="big pinkbtn" type="submit">${t('save')}</button></form>`;
 }
-const MODALS = { job: modalJob, bill: modalBill, sent: modalSent, billDetail: modalBillDetail, client: modalClient, newpass: modalNewPass };
+function modalPrices() {
+  const f = S.form;
+  return `<h2 class="h" style="font-size:24px">${t('myPrices')}</h2>
+  <p class="muted small" style="margin:0">${t('myPricesD')}</p>
+  <div class="col" style="gap:8px">${f.items.map((it, i) => `<div class="lineitem">
+    <input class="in" aria-label="${t('item')}" placeholder="${t('serviceName')}" data-bind="items.${i}.label" value="${esc(it.label)}">
+    <input class="in" aria-label="${t('amount')}" placeholder="$" type="number" inputmode="decimal" min="0" step="0.01" data-bind="items.${i}.amount" value="${esc(it.amount)}">
+    <button class="x" aria-label="${t('delete')}" data-act="rmLine" data-v="${i}">×</button></div>`).join('')}
+    <button class="link" style="align-self:flex-start;padding:0" data-act="addLine">${t('addService')}</button></div>
+  <button class="big pinkbtn" data-act="savePrices">${t('save')}</button>
+  <button class="link" data-act="closeModal">${t('cancel')}</button>`;
+}
+const MODALS = { prices: modalPrices, job: modalJob, bill: modalBill, sent: modalSent, billDetail: modalBillDetail, client: modalClient, newpass: modalNewPass };
 
 // ---------- render ----------
 function render() {
@@ -421,7 +440,19 @@ async function act(a, el) {
       S.modal = { type: 'bill' }; break;
     }
     case 'billClient': { const id = S.form.id; S.form = { client_id: id, job_id: null, items: [], allow_tip: true, note: t('noteDefault') }; S.modal = { type: 'bill' }; break; }
-    case 'preset': { const [k, p] = PRESETS[Number(v)]; S.form.items.push({ label: t(k), amount: p }); break; }
+    case 'preset': { const s = services()[Number(v)]; S.form.items.push({ label: s.label, amount: s.amount }); break; }
+    case 'editPrices': {
+      const back = el.dataset.back ? { modal: S.modal, form: S.form } : null;
+      S.form = { items: services().map(s => ({ label: s.label, amount: s.amount })), _back: back }; S.modal = { type: 'prices' }; break;
+    }
+    case 'savePrices': {
+      const list = S.form.items.map(i => ({ label: String(i.label || '').trim(), amount: Math.round(Number(i.amount) * 100) / 100 })).filter(i => i.label && i.amount >= 0 && !isNaN(i.amount));
+      const { data, error } = await sb.from('businesses').update({ services: list }).eq('id', S.biz.id).select().single();
+      if (error) { toast(t('errGeneric')); return; }
+      S.biz = data; const back = S.form._back;
+      if (back) { S.modal = back.modal; S.form = back.form; } else S.modal = null;
+      toast(t('saved')); break;
+    }
     case 'addLine': S.form.items.push({ label: '', amount: '' }); break;
     case 'rmLine': S.form.items.splice(Number(v), 1); break;
     case 'allowTip': S.form.allow_tip = !S.form.allow_tip; break;

@@ -12,6 +12,7 @@ create table if not exists businesses (
   pay_instructions text default '',
   pay_venmo text default '', pay_cashapp text default '', pay_paypal text default '',
   pay_zelle text default '', pay_applecash text default '',
+  services jsonb,
   phone text default '',
   created_at timestamptz default now()
 );
