@@ -380,6 +380,7 @@ function modalSent() {
     <div class="muted">${esc(c.name || '')} · ${money(b.subtotal)}</div></div>
   ${c.phone ? `<a class="big pinkbtn" href="${esc(smsHref(c.phone, body))}" data-act="noop">${I.send('#fff')}${t('openMessages')}</a>` : `<div class="card muted">${t('noPhone')}</div>`}
   <button class="big ghost" data-act="copyLink" data-v="${b.token}">${t('copyLink')}</button>
+  ${['pay_venmo', 'pay_cashapp', 'pay_zelle', 'pay_applecash', 'pay_paypal'].some(k => S.biz[k]) ? '' : `<div class="card small" style="background:#FFF1C7;border-color:#F2D98A"><b>${t('noPayLinks')}</b> ${t('noPayLinksD')}</div>`}
   <button class="link" data-act="closeModal">${t('close')}</button>`;
 }
 function modalBillDetail() {
@@ -729,7 +730,7 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 async function checkVersion() {
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();

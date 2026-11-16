@@ -36,6 +36,14 @@ function thanks(msg, amount) {
     <p class="muted small" style="margin:0">${t('bp_canClose')}</p>
   </div>`;
 }
+function payHref(b, m, amt) {
+  const a = Number(amt).toFixed(2); const note = encodeURIComponent((b.business || '') + ' cleaning');
+  if (m === 'venmo' && b.pay_venmo) return `https://venmo.com/${encodeURIComponent(b.pay_venmo)}?txn=pay&amount=${a}&note=${note}`;
+  if (m === 'cashapp' && b.pay_cashapp) return `https://cash.app/$${encodeURIComponent(b.pay_cashapp)}/${a}`;
+  if (m === 'applecash' && b.pay_applecash) return `sms:${String(b.pay_applecash).replace(/[^\d+]/g, '')}`;
+  if (m === 'paypal' && b.pay_paypal) return `https://paypal.me/${encodeURIComponent(b.pay_paypal)}/${a}USD`;
+  return '';
+}
 function payButtons(b, amt) {
   const a = Number(amt).toFixed(2);
   const note = encodeURIComponent((b.business || '') + ' cleaning');
@@ -74,7 +82,9 @@ function view() {
   ${b.pay_instructions ? `<div class="card" style="background:#FFF1C7;border-color:#F2D98A"><div style="font-weight:800;margin-bottom:4px">${t('bp_howPay')}</div><div style="white-space:pre-line;font-size:16px">${esc(b.pay_instructions)}</div></div>` : ''}
   <div class="muted small center" style="margin-top:4px">${t('bp_afterPay')}</div>
   <div class="col" style="gap:8px"><div style="font-weight:800">${t('bp_paidWith')}</div>
-    <div class="row" style="flex-wrap:wrap;gap:8px">${PAY.map(m => `<button class="pill ${S.method === m ? 'on' : ''}" data-act="method" data-v="${m}" aria-pressed="${S.method === m}">${t('m_' + m)}</button>`).join('')}</div></div>
+    <div class="row" style="flex-wrap:wrap;gap:8px">${PAY.concat(b.pay_paypal ? ['paypal'] : []).map(m => { const h = payHref(b, m, sub + tipAmt()); return h
+      ? `<a class="pill ${S.method === m ? 'on' : ''}" style="display:inline-flex;align-items:center;text-decoration:none;color:inherit" data-act="payLink" data-v="${m}" href="${esc(h)}" target="_blank" rel="noopener">${t('m_' + m)} ↗</a>`
+      : `<button class="pill ${S.method === m ? 'on' : ''}" data-act="method" data-v="${m}" aria-pressed="${S.method === m}">${t('m_' + m)}</button>`; }).join('')}</div></div>
   <button class="big pinkbtn" data-act="paid" ${S.busy ? 'disabled' : ''}>${t('bp_iPaid')}</button>
   ${b.business_phone ? `<p class="muted center small" style="margin:0">${t('bp_questions')} <a href="tel:${esc(String(b.business_phone).replace(/[^\d+]/g, ''))}">${esc(b.business_phone)}</a></p>` : ''}
 </div>`;
@@ -104,7 +114,7 @@ document.addEventListener('click', async e => {
   }
   render();
 });
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 (async function () {
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
