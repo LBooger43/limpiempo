@@ -502,6 +502,16 @@ async function copy(text) {
   try { await navigator.clipboard.writeText(text); toast(t('linkCopied')); }
   catch (e) { window.prompt(t('copyLink'), text); }
 }
+async function exportCsv(filename, rows) {
+  const csv = '\ufeff' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const file = new File([csv], filename, { type: 'text/csv' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: filename }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const url = URL.createObjectURL(file);
+  const aEl = document.createElement('a'); aEl.href = url; aEl.download = filename; document.body.appendChild(aEl); aEl.click(); aEl.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
 function setPath(o, path, v) { const p = path.split('.'); let x = o; for (let i = 0; i < p.length - 1; i++) x = x[p[i]]; x[p[p.length - 1]] = v; }
 
 // ---------- actions ----------
@@ -588,10 +598,7 @@ async function act(a, el) {
       const rows = [['Client', 'Sent', 'Items', 'Subtotal', 'Tip', 'Total', 'Status', 'Paid on', 'Method']].concat(S.bills.map(b => [
         (client(b.client_id) || {}).name || '', (b.sent_at || '').slice(0, 10), (b.items || []).map(i => i.label).join(' + '),
         Number(b.subtotal).toFixed(2), Number(b.tip || 0).toFixed(2), total(b).toFixed(2), b.status, (b.paid_at || '').slice(0, 10), b.method || '']));
-      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      const aEl = document.createElement('a'); aEl.href = url; aEl.download = `limpiempo-bills-${ymd(new Date())}.csv`; document.body.appendChild(aEl); aEl.click(); aEl.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000); return;
+      await exportCsv(`limpiempo-bills-${ymd(new Date())}.csv`, rows); return;
     }
     // jobs
     case 'addJob': S.form = { id: null, client_id: '', job_date: S.day, start_time: '09:00', hours: 3, crew: [], notes: '' }; S.modal = { type: 'job' }; break;
@@ -662,10 +669,7 @@ async function act(a, el) {
     case 'exportHours': {
       const ws = parseYmd(S.hoursWeek);
       const rows = [['Name', 'Date', 'Clock in', 'Clock out', 'Hours', 'Rate', 'Pay', 'Edited', 'Note']].concat(S.entries.map(e => { const m = member(e.user_id) || {}; const h = entryHours(e); return [m.name || '', ymd(new Date(e.clock_in)), fmtClock(e.clock_in), e.clock_out ? fmtClock(e.clock_out) : '', h.toFixed(2), rateOf(e.user_id).toFixed(2), (h * rateOf(e.user_id)).toFixed(2), e.edited ? 'yes' : '', e.note || '']; }));
-      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      const aEl = document.createElement('a'); aEl.href = url; aEl.download = `limpiempo-hours-${ymd(ws)}.csv`; document.body.appendChild(aEl); aEl.click(); aEl.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000); return;
+      await exportCsv(`limpiempo-hours-${ymd(ws)}.csv`, rows); return;
     }
     default: return;
   }
@@ -730,7 +734,7 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 async function checkVersion() {
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
