@@ -20,6 +20,7 @@ const appUrl = () => new URL('./', location.href).href;
 const cleanPhone = p => String(p || '').replace(/[^\d+]/g, '');
 const smsHref = (phone, body) => `sms:${cleanPhone(phone)}?&body=${encodeURIComponent(body)}`;
 const total = b => Number(b.subtotal) + Number(b.tip || 0);
+const handle = v => String(v || '').trim().replace(/\/+$/, '').split('/').pop().replace(/^[@$]+/, '').replace(/[^A-Za-z0-9_.-]/g, '');
 const METHODS = ['cash', 'zelle', 'venmo', 'applecash', 'cashapp', 'check', 'card', 'other'];
 const PRESETS = [['p_standard', 140], ['p_deep', 220], ['p_move', 300], ['p_fridge', 25], ['p_oven', 25], ['p_windows', 40], ['p_laundry', 20]];
 
@@ -242,7 +243,13 @@ function viewMe() {
     <h2 class="h" style="font-size:20px">${t('bizSettings')}</h2>
     <label class="f">${t('bizName')}<input class="in" id="bz_name" value="${esc(S.biz.name)}" required></label>
     <label class="f">${t('phone')}<input class="in" id="bz_phone" value="${esc(S.biz.phone)}" inputmode="tel"></label>
-    <label class="f">${t('payInstr')}<textarea class="in" id="bz_pay" rows="3">${esc(S.biz.pay_instructions)}</textarea><span class="muted small" style="font-weight:600">${t('payInstrD')}</span></label>
+    <div style="font-weight:800">${t('payLinks')}</div><div class="muted small" style="margin-top:-6px">${t('payLinksD')}</div>
+    <label class="f">${t('pl_venmo')}<input class="in" id="bz_venmo" value="${esc(S.biz.pay_venmo)}" placeholder="@rosa-cleaning" autocapitalize="off"></label>
+    <label class="f">${t('pl_cashapp')}<input class="in" id="bz_cashapp" value="${esc(S.biz.pay_cashapp)}" placeholder="$rosacleaning" autocapitalize="off"></label>
+    <label class="f">${t('pl_zelle')}<input class="in" id="bz_zelle" value="${esc(S.biz.pay_zelle)}" placeholder="(919) 555-0100" autocapitalize="off"></label>
+    <label class="f">${t('pl_applecash')}<input class="in" id="bz_applecash" value="${esc(S.biz.pay_applecash)}" placeholder="(919) 555-0100" inputmode="tel"></label>
+    <label class="f">${t('pl_paypal')}<input class="in" id="bz_paypal" value="${esc(S.biz.pay_paypal)}" placeholder="rosacleaning" autocapitalize="off"></label>
+    <label class="f">${t('payInstr')}<textarea class="in" id="bz_pay" rows="2">${esc(S.biz.pay_instructions)}</textarea><span class="muted small" style="font-weight:600">${t('payInstrD')}</span></label>
     <button class="big tealbtn" type="submit" style="font-size:17px;min-height:50px">${t('save')}</button>
   </form>
   <div class="card col" style="padding:16px">
@@ -522,7 +529,7 @@ async function submit(name) {
       if (error) { toast(t('errGeneric')); return; } S.me = data; const m = member(data.user_id); if (m) Object.assign(m, data); toast(t('saved')); return;
     }
     if (name === 'biz') {
-      const { data, error } = await sb.from('businesses').update({ name: val('bz_name').trim(), phone: val('bz_phone').trim(), pay_instructions: val('bz_pay').trim() }).eq('id', S.biz.id).select().single();
+      const { data, error } = await sb.from('businesses').update({ name: val('bz_name').trim(), phone: val('bz_phone').trim(), pay_instructions: val('bz_pay').trim(), pay_venmo: handle(val('bz_venmo')), pay_cashapp: handle(val('bz_cashapp')), pay_paypal: handle(val('bz_paypal')), pay_zelle: val('bz_zelle').trim(), pay_applecash: val('bz_applecash').trim() }).eq('id', S.biz.id).select().single();
       if (error) { toast(t('errGeneric')); return; } S.biz = data; toast(t('saved')); return;
     }
     if (name === 'newpass') {

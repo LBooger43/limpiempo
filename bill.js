@@ -36,6 +36,20 @@ function thanks(msg, amount) {
     <p class="muted small" style="margin:0">${t('bp_canClose')}</p>
   </div>`;
 }
+function payButtons(b, amt) {
+  const a = Number(amt).toFixed(2);
+  const note = encodeURIComponent((b.business || '') + ' cleaning');
+  const btn = (m, href, label, style) => `<a class="big" data-act="payLink" data-v="${m}" href="${esc(href)}" target="_blank" rel="noopener" style="font-size:18px;${style}">${esc(label)}</a>`;
+  const out = [];
+  if (b.pay_venmo) out.push(btn('venmo', `https://venmo.com/${encodeURIComponent(b.pay_venmo)}?txn=pay&amount=${a}&note=${note}`, t('bp_payWith', 'Venmo', money(a)), 'background:#008CFF;color:#fff'));
+  if (b.pay_cashapp) out.push(btn('cashapp', `https://cash.app/$${encodeURIComponent(b.pay_cashapp)}/${a}`, t('bp_payWith', 'Cash App', money(a)), 'background:#00D632;color:#06210F'));
+  if (b.pay_applecash) out.push(btn('applecash', `sms:${String(b.pay_applecash).replace(/[^\d+]/g, '')}`, t('bp_payWith', 'Apple Cash', money(a)), 'background:#000;color:#fff'));
+  if (b.pay_paypal) out.push(btn('paypal', `https://paypal.me/${encodeURIComponent(b.pay_paypal)}/${a}USD`, t('bp_payWith', 'PayPal', money(a)), 'background:#003087;color:#fff'));
+  let html = out.length ? `<div class="col" style="gap:10px"><div style="font-weight:800">${t('bp_payNow')}</div>${out.join('')}</div>` : '';
+  if (b.pay_applecash) html += `<div class="muted small" style="margin-top:-4px">${t('bp_appleHint', money(a))}</div>`;
+  if (b.pay_zelle) html += `<div class="card col" style="gap:6px;border-color:#D9C8F5;background:#F6F0FF"><div class="between"><b>Zelle · ${money(a)}</b><button class="pill" data-act="copy" data-v="${esc(b.pay_zelle)}">${t('bp_copy')}</button></div><div style="font-size:18px;font-weight:800">${esc(b.pay_zelle)}</div><div class="muted small">${t('bp_zelleHint')}</div></div>`;
+  return html;
+}
 function view() {
   if (S.loading) return `<div class="spinner" role="status"></div>`;
   if (S.error || !S.bill) return `<div class="pad" style="justify-content:center;text-align:center"><div style="align-self:flex-end">${langSeg()}</div><h1 class="h" style="font-size:28px">Limpi<span class="pink">empo</span></h1><p class="muted" style="font-size:17px">${t('bp_notFound')}</p></div>`;
@@ -56,7 +70,9 @@ function view() {
   ${b.allow_tip ? `<div class="col" style="gap:8px"><h2 style="margin:0;font-size:16px">${esc(t('bp_tipQ', b.business))}</h2>
     <div class="tips">${[0, 15, 20, 25].map(p => `<button class="tip ${S.tip === p ? 'on' : ''}" data-act="tip" data-v="${p}" aria-pressed="${S.tip === p}"><b>${p ? p + '%' : t('bp_none')}</b><small>${p ? money(sub * p / 100) : '$0'}</small></button>`).join('')}</div></div>` : ''}
   <div class="between"><span style="font-weight:800;font-size:17px">${t('bp_total')}</span><span class="h" style="font-size:36px">${money(sub + tipAmt())}</span></div>
+  ${payButtons(b, sub + tipAmt())}
   ${b.pay_instructions ? `<div class="card" style="background:#FFF1C7;border-color:#F2D98A"><div style="font-weight:800;margin-bottom:4px">${t('bp_howPay')}</div><div style="white-space:pre-line;font-size:16px">${esc(b.pay_instructions)}</div></div>` : ''}
+  <div class="muted small center" style="margin-top:4px">${t('bp_afterPay')}</div>
   <div class="col" style="gap:8px"><div style="font-weight:800">${t('bp_paidWith')}</div>
     <div class="row" style="flex-wrap:wrap;gap:8px">${PAY.map(m => `<button class="pill ${S.method === m ? 'on' : ''}" data-act="method" data-v="${m}" aria-pressed="${S.method === m}">${t('m_' + m)}</button>`).join('')}</div></div>
   <button class="big pinkbtn" data-act="paid" ${S.busy ? 'disabled' : ''}>${t('bp_iPaid')}</button>
@@ -70,8 +86,11 @@ function render(msg) {
   if (msg) { clearTimeout(toastTimer); toastTimer = setTimeout(() => render(), 2600); }
 }
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act]'); if (!el) return; e.preventDefault();
+  const el = e.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act, v = el.dataset.v;
+  if (a === 'payLink') { S.method = v; setTimeout(() => render(), 400); return; }
+  e.preventDefault();
+  if (a === 'copy') { try { await navigator.clipboard.writeText(v); render(t('bp_copied')); } catch (err) { render(v); } return; }
   if (a === 'lang') { lang = v; setLang(v); }
   else if (a === 'tip') S.tip = Number(v);
   else if (a === 'method') S.method = v;

@@ -39,8 +39,8 @@ window.I18N = {
     m_cash: 'Cash', m_zelle: 'Zelle', m_venmo: 'Venmo', m_check: 'Check', m_card: 'Card', m_cashapp: 'Cash App', m_applecash: 'Apple Cash', m_other: 'Other',
     clients: 'Clients', search: 'Search', addClient: 'Add a client', editClient: 'Edit client', address: 'Address',
     paidSoFar: 'Paid so far', owes: 'Owes', call: 'Call', text: 'Text', noClients: 'No clients yet. Add your first one.',
-    settings: 'Me', language: 'Language', bizSettings: 'Business', payInstr: 'How clients pay you',
-    payInstrD: 'Shown on every bill. Example: Zelle (919) 555-0100 · Venmo @rosa-cleaning',
+    settings: 'Me', language: 'Language', bizSettings: 'Business', payInstr: 'Other payment notes (optional)',
+    payInstrD: 'Shown on every bill. Example: Checks payable to Rosa Martinez',
     team: 'Team', joinCodeLbl: 'Team code', inviteCrew: 'Text an invite to my crew',
     smsInvite: (biz, url, code) => `Join the ${biz} team on Limpiempo! Open ${url} , create an account, tap “Join my team” and enter code ${code}`,
     active: 'Active', inactive: 'Off', signOut: 'Sign out', saved: 'Saved', owner: 'Owner', crewRole: 'Crew',
@@ -53,6 +53,11 @@ window.I18N = {
     clientName: 'Client name', forgot: 'Forgot password?', resetSent: 'Check your email for a reset link.', newPassword: 'Choose a new password',
     codeNotFound: 'That team code wasn’t found. Check it with your boss.',
     p_standard: 'Standard clean', p_deep: 'Deep clean', p_move: 'Move-out clean', p_fridge: 'Inside fridge', p_oven: 'Inside oven', p_windows: 'Windows', p_laundry: 'Laundry',
+    payLinks: 'One-tap payment links', payLinksD: 'Fill in the ones you use. Clients get a button that opens the app with the amount filled in.',
+    pl_venmo: 'Venmo username', pl_cashapp: 'Cash App $cashtag', pl_zelle: 'Zelle phone or email', pl_applecash: 'Apple Cash phone number', pl_paypal: 'PayPal.me name',
+    bp_payNow: 'Pay now', bp_payWith: (m, amt) => `Pay ${amt} with ${m}`, bp_appleHint: amt => `Apple Cash opens Messages: tap ⊕, then Apple Cash, and send ${amt}.`,
+    bp_zelleHint: 'Open your bank’s app, choose Zelle, and send to this phone or email.', bp_copy: 'Copy', bp_copied: 'Copied',
+    bp_afterPay: 'After you pay, come back and tap “I paid” so they know.',
     bp_choose: 'Choose how you paid', bp_receipt: 'Receipt', bp_textBiz: n => `Text ${n}`, bp_canClose: 'All done — you can close this page. Keep the link to see your receipt anytime.'
   },
   es: {
@@ -94,8 +99,8 @@ window.I18N = {
     m_cash: 'Efectivo', m_zelle: 'Zelle', m_venmo: 'Venmo', m_check: 'Cheque', m_card: 'Tarjeta', m_cashapp: 'Cash App', m_applecash: 'Apple Cash', m_other: 'Otro',
     clients: 'Clientes', search: 'Buscar', addClient: 'Agregar cliente', editClient: 'Editar cliente', address: 'Dirección',
     paidSoFar: 'Pagado', owes: 'Debe', call: 'Llamar', text: 'Texto', noClients: 'Todavía no hay clientes. Agrega el primero.',
-    settings: 'Yo', language: 'Idioma', bizSettings: 'Negocio', payInstr: 'Cómo te pagan los clientes',
-    payInstrD: 'Aparece en cada cobro. Ejemplo: Zelle (919) 555-0100 · Venmo @rosa-limpieza',
+    settings: 'Yo', language: 'Idioma', bizSettings: 'Negocio', payInstr: 'Otras notas de pago (opcional)',
+    payInstrD: 'Aparece en cada cobro. Ejemplo: Cheques a nombre de Rosa Martínez',
     team: 'Equipo', joinCodeLbl: 'Código de equipo', inviteCrew: 'Enviar invitación a mi equipo',
     smsInvite: (biz, url, code) => `¡Únete al equipo de ${biz} en Limpiempo! Abre ${url} , crea una cuenta, toca “Unirme a mi equipo” y escribe el código ${code}`,
     active: 'Activo', inactive: 'Apagado', signOut: 'Cerrar sesión', saved: 'Guardado', owner: 'Dueña', crewRole: 'Equipo',
@@ -108,6 +113,11 @@ window.I18N = {
     clientName: 'Nombre del cliente', forgot: '¿Olvidaste tu contraseña?', resetSent: 'Revisa tu correo para cambiar la contraseña.', newPassword: 'Elige una contraseña nueva',
     codeNotFound: 'No encontramos ese código. Confírmalo con tu jefa.',
     p_standard: 'Limpieza estándar', p_deep: 'Limpieza profunda', p_move: 'Limpieza de mudanza', p_fridge: 'Dentro del refri', p_oven: 'Dentro del horno', p_windows: 'Ventanas', p_laundry: 'Lavar ropa',
+    payLinks: 'Enlaces de pago con un toque', payLinksD: 'Llena los que usas. El cliente ve un botón que abre la app con el monto listo.',
+    pl_venmo: 'Usuario de Venmo', pl_cashapp: '$cashtag de Cash App', pl_zelle: 'Teléfono o correo de Zelle', pl_applecash: 'Teléfono de Apple Cash', pl_paypal: 'Nombre de PayPal.me',
+    bp_payNow: 'Pagar ahora', bp_payWith: (m, amt) => `Pagar ${amt} con ${m}`, bp_appleHint: amt => `Apple Cash abre Mensajes: toque ⊕, luego Apple Cash, y envíe ${amt}.`,
+    bp_zelleHint: 'Abra la app de su banco, elija Zelle y envíe a este teléfono o correo.', bp_copy: 'Copiar', bp_copied: 'Copiado',
+    bp_afterPay: 'Después de pagar, regrese y toque “Ya pagué” para avisarle.',
     bp_choose: 'Elija cómo pagó', bp_receipt: 'Recibo', bp_textBiz: n => `Enviar texto a ${n}`, bp_canClose: 'Listo — puede cerrar esta página. Guarde el enlace para ver su recibo cuando quiera.'
   }
 };

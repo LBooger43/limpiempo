@@ -10,6 +10,8 @@ create table if not exists businesses (
   name text not null,
   join_code text unique not null default upper(substr(md5(random()::text), 1, 6)),
   pay_instructions text default '',
+  pay_venmo text default '', pay_cashapp text default '', pay_paypal text default '',
+  pay_zelle text default '', pay_applecash text default '',
   phone text default '',
   created_at timestamptz default now()
 );
@@ -178,6 +180,8 @@ begin
     where token = p_token and status = 'sent';
   select json_build_object(
     'business', b.name, 'business_phone', b.phone, 'pay_instructions', b.pay_instructions,
+    'pay_venmo', b.pay_venmo, 'pay_cashapp', b.pay_cashapp, 'pay_paypal', b.pay_paypal,
+    'pay_zelle', b.pay_zelle, 'pay_applecash', b.pay_applecash,
     'client', c.name, 'items', x.items, 'subtotal', x.subtotal, 'allow_tip', x.allow_tip,
     'tip', x.tip, 'note', x.note, 'status', x.status, 'method', x.method,
     'reported_method', x.reported_method, 'sent_at', x.sent_at, 'paid_at', x.paid_at)
