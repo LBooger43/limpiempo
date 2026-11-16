@@ -20,7 +20,7 @@ const appUrl = () => new URL('./', location.href).href;
 const cleanPhone = p => String(p || '').replace(/[^\d+]/g, '');
 const smsHref = (phone, body) => `sms:${cleanPhone(phone)}?&body=${encodeURIComponent(body)}`;
 const total = b => Number(b.subtotal) + Number(b.tip || 0);
-const METHODS = ['cash', 'zelle', 'venmo', 'cashapp', 'check', 'card', 'other'];
+const METHODS = ['cash', 'zelle', 'venmo', 'applecash', 'cashapp', 'check', 'card', 'other'];
 const PRESETS = [['p_standard', 140], ['p_deep', 220], ['p_move', 300], ['p_fridge', 25], ['p_oven', 25], ['p_windows', 40], ['p_laundry', 20]];
 
 const S = {

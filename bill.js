@@ -8,7 +8,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const money = n => '$' + Number(n || 0).toFixed(2);
 const token = new URLSearchParams(location.search).get('t');
 const S = { bill: null, tip: 20, method: '', loading: true, error: false, busy: false };
-const PAY = ['zelle', 'venmo', 'cashapp', 'cash', 'check', 'other'];
+const PAY = ['zelle', 'venmo', 'applecash', 'cashapp', 'cash', 'check', 'other'];
 const conf = () => [['#FFC93C', 8, 12, 12, 12, 20, 0], ['#14A3A1', 22, 30, 8, 16, -30, 0], ['#E8336D', 80, 10, 14, 9, 35, 0], ['#8B5CF6', 75, 34, 10, 10, 0, 5], ['#FF8A3D', 14, 70, 10, 10, 0, 5], ['#FFC93C', 84, 64, 9, 15, 50, 0]]
   .map(([c, x, y, w, h, r, br]) => `<span class="conf" aria-hidden="true" style="left:${x}%;top:${y}%;width:${w}px;height:${h}px;background:${c};transform:rotate(${r}deg);border-radius:${br}px"></span>`).join('');
 const langSeg = () => `<div class="seg" role="group" aria-label="Language"><button class="${lang === 'en' ? 'on' : ''}" data-act="lang" data-v="en">EN</button><button class="${lang === 'es' ? 'on' : ''}" data-act="lang" data-v="es">ES</button></div>`;
