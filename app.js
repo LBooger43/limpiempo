@@ -15,7 +15,7 @@ const loc = () => (lang === 'es' ? 'es-US' : 'en-US');
 const fmtTime = s => { if (!s) return ''; const [h, m] = s.split(':').map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString(loc(), { hour: 'numeric', minute: '2-digit' }); };
 const fmtDate = (d, o) => d.toLocaleDateString(loc(), o || { weekday: 'short', month: 'short', day: 'numeric' });
 const fmtDT = s => (s ? new Date(s).toLocaleString(loc(), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
-const billUrl = tok => new URL('bill.html?t=' + tok, location.href).href;
+const billUrl = tok => new URL((window.LIMPIEMPO_BILL_PAGE || 'bill.html') + '?t=' + tok, location.href).href;
 const appUrl = () => new URL('./', location.href).href;
 const cleanPhone = p => String(p || '').replace(/[^\d+]/g, '');
 const smsHref = (phone, body) => `sms:${cleanPhone(phone)}?&body=${encodeURIComponent(body)}`;
@@ -378,7 +378,7 @@ function modalSent() {
     <div style="width:72px;height:72px;border-radius:36px;background:var(--tealL);display:flex;align-items:center;justify-content:center">${I.send('#fff')}</div>
     <h2 class="h" style="font-size:28px">${t('billCreated')}</h2>
     <div class="muted">${esc(c.name || '')} · ${money(b.subtotal)}</div></div>
-  ${c.phone ? `<a class="big pinkbtn" href="${esc(smsHref(c.phone, body))}" data-act="noop">${I.send('#fff')}${t('openMessages')}</a>` : `<div class="card muted">${t('noPhone')}</div>`}
+  ${window.LIMPIEMPO_DEMO ? `<a class="big pinkbtn" href="${esc(billUrl(b.token))}">${t('demoSeeClient')}</a>` : c.phone ? `<a class="big pinkbtn" href="${esc(smsHref(c.phone, body))}" data-act="noop">${I.send('#fff')}${t('openMessages')}</a>` : `<div class="card muted">${t('noPhone')}</div>`}
   <button class="big ghost" data-act="copyLink" data-v="${b.token}">${t('copyLink')}</button>
   ${['pay_venmo', 'pay_cashapp', 'pay_zelle', 'pay_applecash', 'pay_paypal'].some(k => S.biz[k]) ? '' : `<div class="card small" style="background:#FFF1C7;border-color:#F2D98A"><b>${t('noPayLinks')}</b> ${t('noPayLinksD')}</div>`}
   <button class="link" data-act="closeModal">${t('close')}</button>`;
@@ -734,8 +734,9 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 async function checkVersion() {
+  if (window.LIMPIEMPO_DEMO) return;
   try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
     if (v && v !== APP_VERSION && sessionStorage.getItem('lp-upd') !== v) { sessionStorage.setItem('lp-upd', v); location.replace(location.pathname + '?v=' + v); }

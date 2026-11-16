@@ -114,9 +114,9 @@ document.addEventListener('click', async e => {
   }
   render();
 });
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 (async function () {
-  try {
+  if (!window.LIMPIEMPO_DEMO) try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
     if (v && v !== APP_VERSION && sessionStorage.getItem('lp-upd') !== v) { sessionStorage.setItem('lp-upd', v); const u = new URL(location.href); u.searchParams.set('v', v); location.replace(u.href); return; }
   } catch (e) {}
