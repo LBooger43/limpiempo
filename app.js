@@ -24,6 +24,8 @@ const handle = v => String(v || '').trim().replace(/\/+$/, '').split('/').pop().
 const METHODS = ['cash', 'zelle', 'venmo', 'applecash', 'cashapp', 'check', 'card', 'other'];
 const PRESETS = [['p_standard', 140], ['p_deep', 220], ['p_move', 300], ['p_fridge', 25], ['p_oven', 25], ['p_windows', 40], ['p_laundry', 20]];
 const services = () => (S.biz && Array.isArray(S.biz.services) && S.biz.services.length) ? S.biz.services : PRESETS.map(([k, p]) => ({ label: t(k), amount: p }));
+const sqftCfg = () => ({ price: Number(S.biz && S.biz.sqft_price) || 160, base: Number(S.biz && S.biz.sqft_base) || 2400, min: Number(S.biz && S.biz.min_price) || 0 });
+const sqftCalc = sq => { const c = sqftCfg(); const n = Number(sq); if (!n || n <= 0) return 0; return Math.max(c.min, Math.round(n * c.price / c.base / 5) * 5); };
 const fmtPrice = n => { const v = Number(n || 0); return '$' + (Number.isInteger(v) ? v : v.toFixed(2)); };
 
 const S = {
@@ -257,6 +259,7 @@ function viewMe() {
   <div class="card col" style="padding:16px">
     <div class="between"><h2 class="h" style="font-size:20px">${t('myPrices')}</h2><button class="pill" data-act="editPrices">${t('edit')}</button></div>
     ${services().map(s => `<div class="between" style="font-size:15px"><span>${esc(s.label)}</span><b>${fmtPrice(s.amount)}</b></div>`).join('')}
+    <div class="muted small" style="border-top:2px dashed var(--line);padding-top:8px">${esc(t('sqftUsing', fmtPrice(sqftCfg().price), sqftCfg().base.toLocaleString('en-US')))}${sqftCfg().min ? ' · ' + t('minPrice').replace(/ \(.*\)/, '') + ' ' + fmtPrice(sqftCfg().min) : ''}</div>
   </div>
   <div class="card col" style="padding:16px">
     <h2 class="h" style="font-size:20px">${t('team')}</h2>
@@ -296,6 +299,13 @@ function modalBill() {
   <div class="f" style="font-weight:800;font-size:14px">${t('quickAdd')}</div>
   <div class="row" style="flex-wrap:wrap;gap:8px">${services().map((s, i) => `<button class="pill" data-act="preset" data-v="${i}">+ ${esc(s.label)} ${fmtPrice(s.amount)}</button>`).join('')}</div>
   <button class="link" style="align-self:flex-start;padding:0" data-act="editPrices" data-back="bill">${t('editPrices')}</button>
+  <div class="card col" style="padding:12px 14px;gap:8px;background:#F2FBFA;border-color:#BFE6E3">
+    <div style="font-weight:800">${t('sqftTitle')}</div>
+    <div class="row" style="gap:8px"><input class="in" style="flex:1" type="number" inputmode="numeric" min="0" step="50" placeholder="${t('sqftEnter')}" aria-label="${t('sqftHome')}" data-bind="sqft" value="${esc(f.sqft || '')}">
+      <span class="h" style="font-size:22px;min-width:76px;text-align:right" id="sqftCalc">${f.sqft ? fmtPrice(sqftCalc(f.sqft)) : '—'}</span></div>
+    <button class="big tealbtn" style="font-size:16px;min-height:46px" data-act="addSqft">${t('sqftAdd')}</button>
+    <div class="muted small">${esc(t('sqftUsing', fmtPrice(sqftCfg().price), sqftCfg().base.toLocaleString('en-US')))}</div>
+  </div>
   <div class="col" style="gap:8px">${f.items.map((it, i) => `<div class="lineitem">
     <input class="in" aria-label="${t('item')}" placeholder="${t('item')}" data-bind="items.${i}.label" value="${esc(it.label)}">
     <input class="in" aria-label="${t('amount')}" placeholder="$" type="number" inputmode="decimal" min="0" step="0.01" data-bind="items.${i}.amount" value="${esc(it.amount)}">
@@ -359,6 +369,7 @@ function modalClient() {
   <label class="f">${t('clientName')}<input class="in" data-bind="name" value="${esc(f.name)}" required></label>
   <label class="f">${t('phone')}<input class="in" data-bind="phone" inputmode="tel" value="${esc(f.phone)}"></label>
   <label class="f">${t('address')}<input class="in" data-bind="address" value="${esc(f.address)}"></label>
+  <label class="f">${t('sqftHome')}<input class="in" type="number" inputmode="numeric" min="0" step="50" data-bind="sqft" value="${esc(f.sqft || '')}"></label>
   <label class="f">${t('notes')}<textarea class="in" data-bind="notes" rows="2">${esc(f.notes)}</textarea></label>
   ${f.id && f.phone ? `<div class="row" style="gap:8px"><a class="big ghost grow" style="font-size:16px;min-height:48px" href="tel:${esc(cleanPhone(f.phone))}">${t('call')}</a><a class="big ghost grow" style="font-size:16px;min-height:48px" href="${esc(smsHref(f.phone, ''))}">${t('text')}</a></div>` : ''}
   <button class="big pinkbtn" data-act="saveClient">${t('save')}</button>
@@ -379,6 +390,15 @@ function modalPrices() {
     <input class="in" aria-label="${t('amount')}" placeholder="$" type="number" inputmode="decimal" min="0" step="0.01" data-bind="items.${i}.amount" value="${esc(it.amount)}">
     <button class="x" aria-label="${t('delete')}" data-act="rmLine" data-v="${i}">×</button></div>`).join('')}
     <button class="link" style="align-self:flex-start;padding:0" data-act="addLine">${t('addService')}</button></div>
+  <div class="card col" style="padding:14px;gap:8px;background:#F2FBFA;border-color:#BFE6E3">
+    <div style="font-weight:800">${t('sqftRate')}</div><div class="muted small" style="margin-top:-4px">${t('sqftRateD')}</div>
+    <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><span style="font-weight:800">$</span>
+      <input class="in" style="width:96px" type="number" inputmode="decimal" min="0" step="1" aria-label="${t('price')}" data-bind="sqft_price" value="${esc(f.sqft_price)}">
+      <span style="font-weight:700">${t('sqftFor')}</span>
+      <input class="in" style="width:110px" type="number" inputmode="numeric" min="0" step="100" aria-label="${t('sqftHome')}" data-bind="sqft_base" value="${esc(f.sqft_base)}">
+      <span style="font-weight:700">${t('sqftUnit')}</span></div>
+    <label class="f">${t('minPrice')}<input class="in" type="number" inputmode="decimal" min="0" step="1" data-bind="min_price" value="${esc(f.min_price)}" placeholder="${t('eg')} 120"></label>
+  </div>
   <button class="big pinkbtn" data-act="savePrices">${t('save')}</button>
   <button class="link" data-act="closeModal">${t('cancel')}</button>`;
 }
@@ -442,12 +462,17 @@ async function act(a, el) {
     case 'billClient': { const id = S.form.id; S.form = { client_id: id, job_id: null, items: [], allow_tip: true, note: t('noteDefault') }; S.modal = { type: 'bill' }; break; }
     case 'preset': { const s = services()[Number(v)]; S.form.items.push({ label: s.label, amount: s.amount }); break; }
     case 'editPrices': {
-      const back = el.dataset.back ? { modal: S.modal, form: S.form } : null;
-      S.form = { items: services().map(s => ({ label: s.label, amount: s.amount })), _back: back }; S.modal = { type: 'prices' }; break;
+      const back = el.dataset.back ? { modal: S.modal, form: S.form } : null; const c = sqftCfg();
+      S.form = { items: services().map(s => ({ label: s.label, amount: s.amount })), sqft_price: c.price, sqft_base: c.base, min_price: c.min || '', _back: back }; S.modal = { type: 'prices' }; break;
+    }
+    case 'addSqft': {
+      const n = Math.round(Number(S.form.sqft)); if (!n || n <= 0) { toast(t('sqftEnter')); return; }
+      S.form.items.push({ label: t('sqftLine', n.toLocaleString('en-US')), amount: sqftCalc(n) }); break;
     }
     case 'savePrices': {
       const list = S.form.items.map(i => ({ label: String(i.label || '').trim(), amount: Math.round(Number(i.amount) * 100) / 100 })).filter(i => i.label && i.amount >= 0 && !isNaN(i.amount));
-      const { data, error } = await sb.from('businesses').update({ services: list }).eq('id', S.biz.id).select().single();
+      const f2 = S.form; const sp = Number(f2.sqft_price), sb2 = Math.round(Number(f2.sqft_base)), mp = Number(f2.min_price) || 0;
+      const { data, error } = await sb.from('businesses').update({ services: list, sqft_price: sp > 0 ? sp : null, sqft_base: sb2 > 0 ? sb2 : null, min_price: mp > 0 ? mp : null }).eq('id', S.biz.id).select().single();
       if (error) { toast(t('errGeneric')); return; }
       S.biz = data; const back = S.form._back;
       if (back) { S.modal = back.modal; S.form = back.form; } else S.modal = null;
@@ -516,7 +541,7 @@ async function act(a, el) {
     case 'editClient': { const c = client(v); S.form = { ...c }; S.modal = { type: 'client' }; break; }
     case 'saveClient': {
       const f = S.form; if (!String(f.name || '').trim()) { toast(t('client') + '?'); return; }
-      const row = { business_id: S.me.business_id, name: f.name.trim(), phone: f.phone || '', address: f.address || '', notes: f.notes || '' };
+      const row = { business_id: S.me.business_id, name: f.name.trim(), phone: f.phone || '', address: f.address || '', notes: f.notes || '', sqft: Math.round(Number(f.sqft)) > 0 ? Math.round(Number(f.sqft)) : null };
       const res = f.id ? await sb.from('clients').update(row).eq('id', f.id).select().single() : await sb.from('clients').insert(row).select().single();
       if (res.error) { toast(t('errGeneric')); return; }
       if (f.id) Object.assign(client(f.id), res.data); else { S.clients.push(res.data); S.clients.sort((x, y) => x.name.localeCompare(y.name)); }
@@ -587,6 +612,8 @@ function onInput(e) {
   if (el.dataset.bind) {
     setPath(S.form, el.dataset.bind, el.value);
     if (el.dataset.bind.startsWith('items.')) { const tEl = document.getElementById('draftTotal'); if (tEl) tEl.textContent = money(draftTotal()); }
+    if (el.dataset.bind === 'sqft' && S.modal && S.modal.type === 'bill') { const c = document.getElementById('sqftCalc'); if (c) c.textContent = Number(el.value) > 0 ? fmtPrice(sqftCalc(el.value)) : '—'; }
+    if (el.dataset.bind === 'client_id' && S.modal && S.modal.type === 'bill') { const c = client(el.value); if (c && c.sqft) { S.form.sqft = c.sqft; render(); } }
   } else if (el.dataset.actInput === 'search') { S.q = el.value; render(); }
 }
 document.addEventListener('input', onInput);

@@ -12,7 +12,7 @@ create table if not exists businesses (
   pay_instructions text default '',
   pay_venmo text default '', pay_cashapp text default '', pay_paypal text default '',
   pay_zelle text default '', pay_applecash text default '',
-  services jsonb,
+  services jsonb, sqft_price numeric(10,2), sqft_base int, min_price numeric(10,2),
   phone text default '',
   created_at timestamptz default now()
 );
@@ -34,6 +34,7 @@ create table if not exists clients (
   name text not null,
   phone text default '',
   address text default '',
+  sqft int,
   notes text default '',
   created_at timestamptz default now()
 );
