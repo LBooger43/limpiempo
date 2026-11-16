@@ -727,6 +727,13 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
+const APP_VERSION = '10';
+async function checkVersion() {
+  try {
+    const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
+    if (v && v !== APP_VERSION && sessionStorage.getItem('lp-upd') !== v) { sessionStorage.setItem('lp-upd', v); location.replace(location.pathname + '?v=' + v); }
+  } catch (e) {}
+}
 (async function boot() {
   if (!C || !C.url || C.url.startsWith('PASTE')) {
     document.getElementById('app').innerHTML = '<div class="pad"><h1 class="h">Limpiempo</h1><p>Setup needed: put your Supabase URL and anon key in <b>config.js</b>.</p></div>';
@@ -739,6 +746,7 @@ document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') on
     if ((session && session.user.id) !== had) setTimeout(loadMe, 0);
   });
   await loadMe();
+  checkVersion(); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
   setInterval(() => { const el = document.getElementById('clockTimer'); if (el && S.openEntry) el.textContent = fmtHM(entryHours(S.openEntry)); }, 30000);
   document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && S.me && !S.modal) { await refresh(); render(); } });
 })();

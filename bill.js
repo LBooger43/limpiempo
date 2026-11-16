@@ -104,7 +104,12 @@ document.addEventListener('click', async e => {
   }
   render();
 });
+const APP_VERSION = '10';
 (async function () {
+  try {
+    const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();
+    if (v && v !== APP_VERSION && sessionStorage.getItem('lp-upd') !== v) { sessionStorage.setItem('lp-upd', v); const u = new URL(location.href); u.searchParams.set('v', v); location.replace(u.href); return; }
+  } catch (e) {}
   if (!token || !/^[0-9a-f-]{36}$/i.test(token)) { S.loading = false; S.error = true; render(); return; }
   const { data, error } = await sb.rpc('get_bill', { p_token: token });
   S.loading = false; S.error = !!error; S.bill = data || null; render();
