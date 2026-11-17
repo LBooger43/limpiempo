@@ -32,7 +32,7 @@ const S = {
   session: null, me: null, biz: null, members: [], clients: [], jobs: [], todayJobs: [], bills: [],
   tab: 'today', day: ymd(new Date()), week: ymd(weekStart(new Date())), who: 'all', filter: 'all', q: '',
   modal: null, form: {}, authMode: 'in', loading: true, toast: '',
-  entries: [], openEntry: null, pay: [], hoursWeek: ymd(weekStart(new Date())), hoursWho: null
+  entries: [], openEntry: null, pay: [], hoursWeek: ymd(weekStart(new Date())), hoursWho: null, hJobs: [], hoursView: 'hours', clockJob: null
 };
 const isOwner = () => S.me && S.me.role === 'owner';
 const member = id => S.members.find(m => m.user_id === id);
@@ -105,11 +105,14 @@ async function refresh() {
   S.members = r[0].data || []; S.clients = r[1].data || []; S.jobs = r[2].data || []; S.todayJobs = r[3].data || [];
   S.entries = r[4].data || []; S.openEntry = (r[5].data || [])[0] || null;
   S.bills = (r[6] && r[6].data) || []; S.pay = (r[7] && r[7].data) || [];
+  if (isOwner()) await loadEntries();
 }
 async function loadEntries() {
   const hw = parseYmd(S.hoursWeek);
-  const { data } = await sb.from('time_entries').select('*').gte('clock_in', hw.toISOString()).lt('clock_in', addDays(hw, 7).toISOString()).order('clock_in');
-  S.entries = data || [];
+  const [r1, r2] = await Promise.all([
+    sb.from('time_entries').select('*').gte('clock_in', hw.toISOString()).lt('clock_in', addDays(hw, 7).toISOString()).order('clock_in'),
+    sb.from('jobs').select('*').gte('job_date', ymd(hw)).lte('job_date', ymd(addDays(hw, 6))).order('job_date').order('start_time')]);
+  S.entries = r1.data || []; S.hJobs = r2.data || [];
 }
 // ---------- hours ----------
 const entryHours = e => Math.max(0, ((e.clock_out ? new Date(e.clock_out) : new Date()) - new Date(e.clock_in)) / 36e5);
@@ -117,16 +120,34 @@ const fmtHM = h => { const m = Math.round(h * 60); return `${Math.floor(m / 60)}
 const rateOf = id => Number((S.pay.find(p => p.user_id === id) || {}).hourly_rate || 0);
 const fmtClock = s => new Date(s).toLocaleTimeString(loc(), { hour: 'numeric', minute: '2-digit' });
 const toLocalInput = s => { if (!s) return ''; const d = new Date(s); return `${ymd(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function myTodayJobs() {
+  const mine = S.todayJobs.filter(j => (j.crew || []).includes(S.me.user_id));
+  return mine.length ? mine : (isOwner() ? S.todayJobs : []);
+}
+const jobName = id => { const j = S.todayJobs.find(x => x.id === id) || S.hJobs.find(x => x.id === id) || S.jobs.find(x => x.id === id); return j ? ((client(j.client_id) || {}).name || '—') : ''; };
 function clockCard() {
-  const o = S.openEntry;
-  if (o) return `<div class="card col" style="background:#E7F7EF;border-color:#A9DFC3;padding:16px">
+  const o = S.openEntry; const jobs = myTodayJobs();
+  if (o) {
+    const others = jobs.filter(j => j.id !== o.job_id);
+    return `<div class="card col" style="background:#E7F7EF;border-color:#A9DFC3;padding:16px">
     <div class="between"><span class="chip c-paid">● ${t('clockedIn')}</span><span class="muted small">${t('since')} ${esc(fmtClock(o.clock_in))}</span></div>
     <div class="h" style="font-size:40px;line-height:1" id="clockTimer">${fmtHM(entryHours(o))}</div>
+    ${o.job_id ? `<div style="font-weight:800">${esc(t('atHouse', jobName(o.job_id)))}</div>` : ''}
+    ${others.length ? `<div class="muted small" style="font-weight:700">${t('switchHouse')}</div><div class="row" style="flex-wrap:wrap;gap:8px">${others.map(j => `<button class="pill" data-act="switchJob" data-v="${j.id}">→ ${esc((client(j.client_id) || {}).name || '—')}</button>`).join('')}</div>` : ''}
     <button class="big ghost" data-act="clockOut">${t('clockOut')}</button></div>`;
+  }
   const mineWeek = S.entries.filter(e => e.user_id === S.me.user_id).reduce((x, e) => x + entryHours(e), 0);
+  if (jobs.length && !jobs.some(j => j.id === S.clockJob)) {
+    const now = new Date(); const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const later = jobs.filter(j => (j.start_time || '') >= hm); const before = jobs.filter(j => (j.start_time || '') < hm);
+    S.clockJob = (before.length ? before[before.length - 1] : later[0]).id;
+  }
+  const pick = jobs.find(j => j.id === S.clockJob);
   return `<div class="card col" style="padding:16px">
     <div class="between"><b>${t('timeClock')}</b><span class="muted small">${t('thisWeek')}: ${fmtHM(mineWeek)}</span></div>
-    <button class="big tealbtn" data-act="clockIn">${t('clockIn')}</button></div>`;
+    ${jobs.length > 1 ? `<div class="muted small" style="font-weight:700;margin-top:-4px">${t('whichHouse')}</div>
+    ${jobs.map(j => { const c = client(j.client_id) || {}; return `<button class="opt ${S.clockJob === j.id ? 'on' : ''}" data-act="pickClockJob" data-v="${j.id}" aria-pressed="${S.clockJob === j.id}"><span class="dot"></span><span style="flex:1"><b style="display:block">${esc(c.name || '—')}</b><span class="muted small">${esc(fmtTime(j.start_time))}${c.address ? ' · ' + esc(c.address) : ''}</span></span></button>`; }).join('')}` : ''}
+    <button class="big tealbtn" data-act="clockIn">${pick ? esc(t('clockInHouse', (client(pick.client_id) || {}).name || '')) : t('clockIn')}</button></div>`;
 }
 
 // ---------- views ----------
@@ -262,6 +283,47 @@ function viewClients() {
       ${owe ? `<span class="chip c-wait">${t('owes')} ${money0(owe)}</span>` : ''}</button>`; }).join('') : `<div class="card muted center" style="padding:22px">${t('noClients')}</div>`}</div>
 </div>`;
 }
+function laborByJob() {
+  const res = {}; let unH = 0, unC = 0;
+  const add = (jid, uid, h) => { const r = res[jid] || (res[jid] = { hours: 0, cost: 0, people: {} }); const c = h * rateOf(uid); r.hours += h; r.cost += c; const p = r.people[uid] || (r.people[uid] = { h: 0, cost: 0 }); p.h += h; p.cost += c; };
+  S.entries.forEach(e => {
+    const h = entryHours(e);
+    if (e.job_id && S.hJobs.some(j => j.id === e.job_id)) return add(e.job_id, e.user_id, h);
+    const d = ymd(new Date(e.clock_in)); const js = S.hJobs.filter(j => j.job_date === d && (j.crew || []).includes(e.user_id));
+    if (js.length) js.forEach(j => add(j.id, e.user_id, h / js.length)); else { unH += h; unC += h * rateOf(e.user_id); }
+  });
+  return { res, unH, unC };
+}
+const r0 = n => money0(Math.round(Number(n) || 0));
+const billForJob = id => S.bills.find(b => b.job_id === id && b.status !== 'void');
+function viewPerf() {
+  const { res, unH, unC } = laborByJob();
+  const todayK = ymd(new Date());
+  const rows = S.hJobs.filter(j => j.job_date <= todayK || billForJob(j.id) || S.entries.some(x => x.job_id === j.id)).map(j => { const b = billForJob(j.id); const L = res[j.id] || { hours: 0, cost: 0, people: {} }; const rev = b ? Number(b.subtotal) : 0; const sup = b ? Number(b.supplies || 0) : 0;
+    const crewN = Math.max(1, Object.keys(L.people).length); const actual = L.hours / crewN; const profit = rev - L.cost - sup;
+    return { j, b, L, rev, sup, profit, pct: rev ? Math.round(profit / rev * 100) : null, over: L.hours ? actual - Number(j.hours || 0) : 0, actual }; });
+  const billed = rows.reduce((x, r) => x + r.rev, 0), sup = rows.reduce((x, r) => x + r.sup, 0);
+  const laborCost = Object.values(res).reduce((x, r) => x + r.cost, 0) + unC, laborH = Object.values(res).reduce((x, r) => x + r.hours, 0) + unH;
+  const profit = billed - laborCost - sup;
+  const noRate = [...new Set(S.entries.map(e => e.user_id))].filter(id => !rateOf(id)).map(id => (member(id) || {}).name).filter(Boolean);
+  const people = S.members.map(m => { let h = 0; const jobs = new Set(); Object.entries(res).forEach(([jid, r]) => { if (r.people[m.user_id]) { h += r.people[m.user_id].h; jobs.add(jid); } }); return { m, h, n: jobs.size }; }).filter(p => p.h > 0);
+  return `
+  ${noRate.length ? `<div class="card small" style="background:#FFF1C7;border-color:#F2D98A">${esc(t('needRates', noRate.join(', ')))}</div>` : ''}
+  <div class="stats"><div class="stat c-rep"><small>${t('billed')}</small><b>${r0(billed)}</b></div><div class="stat c-over"><small>${t('labor')}</small><b>${r0(laborCost + sup)}</b></div><div class="stat c-paid"><small>${t('profit')}</small><b>${r0(profit)}</b></div></div>
+  <div class="card col" style="gap:6px"><div class="between"><b>${t('perLaborHour')}</b><span class="h" style="font-size:24px;color:var(--teal)">${laborH ? r0(Math.round(billed / laborH)) : '—'}</span></div><div class="muted small">${esc(t('perLaborHourD', r0(billed), laborH.toFixed(1)))}</div></div>
+  <h2 class="h" style="font-size:20px">${t('byJob')}</h2>
+  <div class="col">${rows.length ? rows.map(r => { const c = client(r.j.client_id) || {}; const bad = r.pct !== null && r.pct < 30; const col = bad ? '#E8336D' : '#14A3A1';
+    return `<${r.b ? 'button' : 'div'} class="card col" style="gap:8px;text-align:left;${bad ? 'border:2px solid #E8336D' : ''}" ${r.b ? `data-act="openBill" data-v="${r.b.id}"` : ''}>
+      <span class="between" style="width:100%"><span><b>${esc(c.name || '—')}</b> <span class="muted small">· ${esc(fmtDate(parseYmd(r.j.job_date), { weekday: 'short' }))}</span></span>${r.pct === null ? `<span class="chip c-wait">${t('noBillYet')}</span>` : `<span class="chip ${bad ? 'c-over' : 'c-paid'}">${t('profitPct', r.pct)}</span>`}</span>
+      ${r.pct !== null ? `<span class="bar" style="width:100%;display:block"><i style="width:${Math.max(0, Math.min(100, r.pct))}%;background:${col}"></i></span>` : ''}
+      <span class="between small" style="width:100%"><span>${r.b ? esc(t('billedLine', r0(r.rev))) + ' · ' : ''}${esc(t('laborLine', fmtHM(r.L.hours), r0(r.L.cost + r.sup)))}</span>${r.b ? `<b style="${r.profit >= 0 ? 'color:#136C43' : 'color:#A3152A'}">${r.profit >= 0 ? '+' : ''}${r0(r.profit)}</b>` : ''}</span>
+      ${r.over > 0.5 ? `<span class="small" style="color:#A3152A;font-weight:700">${esc(t('tookLonger', fmtHM(r.over)))}</span>` : ''}
+    </${r.b ? 'button' : 'div'}>`; }).join('') : `<div class="card muted center" style="padding:22px">${t('perfEmpty')}</div>`}</div>
+  ${unH > 0.01 ? `<div class="muted small">${esc(t('unassigned'))}: ${fmtHM(unH)} · ${r0(unC)}</div>` : ''}
+  <h2 class="h" style="font-size:20px">${t('byPerson')}</h2>
+  <div class="card col" style="gap:10px">${people.length ? people.map(p => `<div class="between">${'<span class="row" style="gap:8px">' + av(p.m.user_id) + '<b>' + esc(p.m.name) + '</b></span>'}<span class="small">${fmtHM(p.h)} · ${t('jobsN', p.n)} · <b>${esc(t('perJob', fmtHM(p.n ? p.h / p.n : 0)))}</b></span></div>`).join('') : `<div class="muted small">${t('noHours')}</div>`}</div>
+  <p class="muted small" style="margin:0">${t('perfNote')}</p>`;
+}
 function viewHours() {
   const ws = parseYmd(S.hoursWeek); const we = addDays(ws, 6);
   const people = isOwner() ? S.members.filter(m => m.active || S.entries.some(e => e.user_id === m.user_id)) : S.members.filter(m => m.user_id === S.me.user_id);
@@ -274,6 +336,8 @@ function viewHours() {
   <div class="between"><h1 class="h" style="font-size:30px">${t('hours')}</h1>
     <div class="row" style="gap:4px"><button class="x" aria-label="Previous week" data-act="hoursWeek" data-v="-1">‹</button><button class="x" aria-label="Next week" data-act="hoursWeek" data-v="1">›</button></div></div>
   <div class="muted small" style="margin-top:-8px;font-weight:700">${esc(fmtDate(ws, { month: 'short', day: 'numeric' }))} – ${esc(fmtDate(we, { month: 'short', day: 'numeric' }))}</div>
+  ${isOwner() ? `<div class="seg" role="group" style="align-self:flex-start"><button class="${S.hoursView === 'hours' ? 'on' : ''}" data-act="hoursView" data-v="hours">${t('tHours')}</button><button class="${S.hoursView === 'perf' ? 'on' : ''}" data-act="hoursView" data-v="perf">${t('tabPerf')}</button></div>` : ''}
+  ${isOwner() && S.hoursView === 'perf' ? viewPerf() + '</div>' : ''}${isOwner() && S.hoursView === 'perf' ? '' : `
   ${isOwner() ? `<div class="stats" style="grid-template-columns:repeat(2,1fr)"><div class="stat c-rep"><small>${t('totalHours')}</small><b>${fmtHM(totH)}</b></div><div class="stat c-paid"><small>${t('totalPay')}</small><b>${money(totP)}</b></div></div>` : ''}
   <div class="col">${rows.map(r => `<div class="card col" style="gap:6px">
     <button class="between" style="width:100%;border:none;background:none;padding:0;text-align:left" data-act="hoursWho" data-v="${r.m.user_id}" aria-expanded="${S.hoursWho === r.m.user_id || !isOwner()}">
@@ -284,7 +348,7 @@ function viewHours() {
       ${isOwner() ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button class="pill" data-act="editRate" data-v="${r.m.user_id}">${t('setRate')}</button><button class="pill" data-act="addEntry" data-v="${r.m.user_id}">${t('addHours')}</button></div>` : ''}` : ''}
   </div>`).join('') || `<div class="card muted center" style="padding:22px">${t('noHours')}</div>`}</div>
   ${isOwner() ? `<p class="muted small" style="margin:0">${t('hoursTip')}</p><button class="big ghost" style="font-size:16px" data-act="exportHours">${t('exportCsv')}</button>` : ''}
-</div>`;
+</div>`}`;
 }
 function viewMe() {
   const inviteBody = S.biz ? t('smsInvite', S.biz.name, appUrl(), S.biz.join_code) : '';
@@ -383,6 +447,21 @@ function modalSent() {
   ${['pay_venmo', 'pay_cashapp', 'pay_zelle', 'pay_applecash', 'pay_paypal'].some(k => S.biz[k]) ? '' : `<div class="card small" style="background:#FFF1C7;border-color:#F2D98A"><b>${t('noPayLinks')}</b> ${t('noPayLinksD')}</div>`}
   <button class="link" data-act="closeModal">${t('close')}</button>`;
 }
+function jobProfitCard(b) {
+  if (!b.job_id) return `<div class="muted small">${t('noJobLink')}</div>`;
+  const j = S.hJobs.find(x => x.id === b.job_id);
+  if (!j) return '';
+  const L = laborByJob().res[b.job_id] || { hours: 0, cost: 0, people: {} };
+  const sup = Number(S.form.supplies ?? b.supplies ?? 0) || 0; const rev = Number(b.subtotal); const profit = rev - L.cost - sup;
+  const crewN = Math.max(1, Object.keys(L.people).length);
+  return `<div class="card col" style="gap:8px;background:#F2FBFA;border-color:#BFE6E3">
+    <div class="between"><b>${t('jobProfit')}</b><span class="h" style="font-size:26px;color:${profit >= 0 ? '#136C43' : '#A3152A'}">${profit >= 0 ? '+' : ''}${r0(profit)}</span></div>
+    ${Object.entries(L.people).map(([uid, p]) => `<div class="between small"><span class="row" style="gap:6px">${av(uid)}${esc((member(uid) || {}).name || '')} · ${fmtHM(p.h)}${rateOf(uid) ? ' × ' + r0(rateOf(uid)) : ''}</span><b>${rateOf(uid) ? r0(p.cost) : t('noRate')}</b></div>`).join('') || `<div class="muted small">${t('noHours')}</div>`}
+    <div class="between small"><label for="supIn">${t('supplies')}</label><span class="row" style="gap:6px"><input id="supIn" class="in" style="width:90px;min-height:38px;padding:6px 8px" type="number" inputmode="decimal" min="0" step="1" data-bind="supplies" value="${esc(S.form.supplies ?? (Number(b.supplies) || ''))}" placeholder="$0"><button class="pill" style="min-height:38px" data-act="saveSupplies">${t('save')}</button></span></div>
+    <div style="border-top:2px dashed #BFE6E3"></div>
+    <div class="between small"><span>${esc(t('planned', fmtHM(Number(j.hours || 0)), fmtHM(L.hours / crewN)))}</span>${rev ? `<span class="chip ${profit / rev < 0.3 ? 'c-over' : 'c-paid'}" style="padding:3px 8px">${t('profitPct', Math.round(profit / rev * 100))}</span>` : ''}</div>
+  </div>`;
+}
 function modalBillDetail() {
   const b = S.bills.find(x => x.id === S.modal.id); if (!b) return '';
   const c = client(b.client_id) || {}; const f = S.form;
@@ -403,6 +482,7 @@ function modalBillDetail() {
     <div style="border-top:2px dashed var(--line)"></div>
     <div class="between"><b>${t('total')}</b><span class="h" style="font-size:26px">${money(total(b))}</span></div>
   </div>
+  ${jobProfitCard(b)}
   <h3 class="h" style="font-size:18px">${t('history')}</h3>
   <div>${steps.map((s, i) => `<div class="step"><div class="rail"><span class="bead" style="background:${s.col}"></span>${i < steps.length - 1 ? '<span class="stem"></span>' : ''}</div>
     <div style="padding-bottom:10px"><div style="font-weight:800;${s.pending ? 'color:#8A7F9C' : ''}">${esc(s.label)}</div><div class="muted small">${esc(s.when)}</div></div></div>`).join('')}</div>
@@ -571,6 +651,9 @@ async function act(a, el) {
       const items = f.items.map(i => ({ label: String(i.label || '').trim(), amount: Math.round(Number(i.amount) * 100) / 100 })).filter(i => i.label && i.amount > 0);
       if (!items.length) { toast(t('needItems')); return; }
       const subtotal = Math.round(items.reduce((x, i) => x + i.amount, 0) * 100) / 100;
+      if (!f.job_id) { const pool = [...S.todayJobs, ...S.jobs, ...S.hJobs]; const now = new Date(); let best = null;
+        pool.forEach(j => { if (j.client_id !== f.client_id || billForJob(j.id)) return; const dd = Math.abs(parseYmd(j.job_date) - now) / 864e5; if (dd <= 7 && (!best || dd < best.dd)) best = { id: j.id, dd }; });
+        if (best) f.job_id = best.id; }
       const { data, error } = await sb.from('bills').insert({ business_id: S.me.business_id, client_id: f.client_id, job_id: f.job_id || null, items, subtotal, allow_tip: !!f.allow_tip, note: f.note || '', created_by: S.me.user_id }).select().single();
       if (error) { toast(t('errGeneric')); return; }
       S.bills.unshift(data); S.modal = { type: 'sent', id: data.id }; S.form = {}; break;
@@ -638,8 +721,19 @@ async function act(a, el) {
       const m = member(v); const { error } = await sb.from('members').update({ active: !m.active }).eq('user_id', v);
       if (!error) m.active = !m.active; break;
     }
+    case 'pickClockJob': S.clockJob = v; break;
+    case 'hoursView': S.hoursView = v; if (v === 'perf') await loadEntries(); break;
+    case 'switchJob': {
+      const { error } = await sb.rpc('switch_job', { p_job: v }); if (error) { toast(t('errGeneric')); return; }
+      await refresh(); toast(t('switchedToast', jobName(v))); break;
+    }
+    case 'saveSupplies': {
+      const b = S.bills.find(x => x.id === S.modal.id); const s = Math.max(0, Number(S.form.supplies) || 0);
+      const { error } = await sb.from('bills').update({ supplies: s }).eq('id', b.id); if (error) { toast(t('errGeneric')); return; }
+      b.supplies = s; toast(t('saved')); break;
+    }
     case 'clockIn': {
-      const { error } = await sb.rpc('clock_in'); if (error) { toast(/already/i.test(error.message) ? t('alreadyIn') : t('errGeneric')); }
+      const { error } = await sb.rpc('clock_in', { p_job: myTodayJobs().some(j => j.id === S.clockJob) ? S.clockJob : null }); if (error) { toast(/already/i.test(error.message) ? t('alreadyIn') : t('errGeneric')); }
       await refresh(); if (!error) toast(t('clockedInToast')); break;
     }
     case 'clockOut': {
@@ -734,7 +828,7 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 async function checkVersion() {
   if (window.LIMPIEMPO_DEMO) return;
   try {

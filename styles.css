@@ -77,3 +77,8 @@ textarea.in{resize:vertical;min-height:70px}
 .fab-refresh{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:25;width:46px;height:46px;border-radius:23px;border:2px solid var(--line2);background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(42,31,61,.15)}
 @media (min-width:600px){.fab-refresh{right:calc(50% - 264px)}}
 .fab-refresh.spin svg{animation:spin .8s linear infinite}
+.bar{height:10px;border-radius:5px;background:#F0E2CC;overflow:hidden}.bar i{display:block;height:100%}
+.opt{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:18px;background:#fff;border:2px solid var(--line);text-align:left;font-size:15px;color:var(--ink)}
+.opt.on{background:#E7F7EF;border-color:var(--teal)}
+.opt .dot{width:20px;height:20px;border-radius:10px;border:2px solid #B9AC98;flex-shrink:0;box-sizing:border-box}
+.opt.on .dot{border:6px solid var(--teal);background:#fff}

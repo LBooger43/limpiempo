@@ -114,7 +114,7 @@ document.addEventListener('click', async e => {
   }
   render();
 });
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 (async function () {
   if (!window.LIMPIEMPO_DEMO) try {
     const v = (await (await fetch('version.txt?x=' + Date.now(), { cache: 'no-store' })).text()).trim();

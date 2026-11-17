@@ -5,7 +5,7 @@
 window.LIMPIEMPO_DEMO = true;
 window.LIMPIEMPO_BILL_PAGE = 'demo-bill.html';
 window.LIMPIEMPO_CONFIG = { url: 'https://demo.local', anonKey: 'demo' };
-const KEY = 'limpiempo-demo-db-v1', ROLE_KEY = 'limpiempo-demo-role';
+const KEY = 'limpiempo-demo-db-v3', ROLE_KEY = 'limpiempo-demo-role';
 const BIZ = 'biz-demo', ROSA = 'u-rosa', ANA = 'u-ana', LUIS = 'u-luis';
 let n = 0; const uid = () => 'd' + Date.now().toString(36) + (++n).toString(36) + Math.random().toString(36).slice(2, 6);
 const tok = () => 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
@@ -13,6 +13,7 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')
 const day = off => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + off); return d; };
 const at = (off, h, m = 0) => { const d = day(off); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const ago = hrs => new Date(Date.now() - hrs * 36e5).toISOString();
+const parseD = s => { const [y, m, dd] = s.split('-').map(Number); return new Date(y, m - 1, dd); };
 
 function seed() {
   const today = new Date(); const dow = today.getDay();
@@ -41,26 +42,35 @@ function seed() {
   ];
   const bill = (name, off, items, status, extra = {}) => {
     const sub = items.reduce((x, i) => x + i.amount, 0);
-    return Object.assign({ id: uid(), business_id: BIZ, client_id: id(name), job_id: null, token: tok(), items, subtotal: sub, allow_tip: true, tip: 0,
+    return Object.assign({ id: uid(), business_id: BIZ, client_id: id(name), job_id: null, token: tok(), items, subtotal: sub, allow_tip: true, tip: 0, supplies: 0,
       note: 'Thank you! Your home is sparkling.', status, method: null, reported_method: null, sent_at: at(off, 15), opened_at: null, reported_at: null,
       paid_at: null, reminders: [], created_by: ROSA, created_at: at(off, 15) }, extra);
   };
-  const bills = [
-    bill('Dr. Patel', 0, [{ label: 'Standard clean', amount: 165 }], 'paid', { tip: 25, method: 'venmo', sent_at: ago(5), opened_at: ago(4.8), paid_at: ago(4.7), job_id: jobs[0].id }),
-    bill('Okafor', -2, [{ label: 'Deep clean', amount: 240 }, { label: 'Inside oven', amount: 25 }], 'reported', { tip: 40, reported_method: 'zelle', opened_at: at(-2, 17), reported_at: at(-2, 18) }),
-    bill('Williams', -2, [{ label: 'Cleaning – 1,800 sq ft', amount: 120 }], 'opened', { opened_at: at(-2, 19) }),
-    bill('Rivera', -3, [{ label: 'Standard clean', amount: 160 }, { label: 'Inside fridge', amount: 25 }], 'paid', { tip: 37, method: 'applecash', opened_at: at(-3, 16), paid_at: at(-3, 16, 30) }),
-    bill('Chen', -10, [{ label: 'Cleaning – 2,900 sq ft', amount: 195 }], 'opened', { opened_at: at(-9, 9), reminders: [at(-4, 9)] }),
-    bill('Gómez', -7, [{ label: 'Deep clean', amount: 240 }], 'paid', { tip: 48, method: 'cashapp', opened_at: at(-7, 16), paid_at: at(-7, 17) })
+  const te = []; const bills = [];
+  const work = (job, who, h1, m1, h2, m2) => te.push({ id: uid(), business_id: BIZ, user_id: who, job_id: job.id, clock_in: at(0, 0) && (() => { const d = parseD(job.job_date); d.setHours(h1, m1, 0, 0); return d.toISOString(); })(), clock_out: (() => { const d = parseD(job.job_date); d.setHours(h2, m2, 0, 0); return d.toISOString(); })(), note: '', edited: false, created_at: ago(1) });
+  // Past days of this week: jobs with bills and real hours (so Performance has numbers)
+  const past = [
+    ['Gómez', '08:30:00', 4, [ANA, LUIS], [{ label: 'Deep clean', amount: 240 }, { label: 'Windows', amount: 48 }], [[ANA, 8, 30, 12, 40], [LUIS, 8, 30, 12, 25]], 'paid', 'cashapp', 30, 18],
+    ['Williams', '13:30:00', 3, [ANA, LUIS], [{ label: 'Cleaning – 1,800 sq ft', amount: 120 }], [[ANA, 13, 5, 17, 50], [LUIS, 13, 5, 17, 45]], 'opened', null, 0, 0],
+    ['Rivera', '09:00:00', 3, [ROSA, ANA], [{ label: 'Standard clean', amount: 160 }, { label: 'Inside fridge', amount: 25 }], [[ROSA, 9, 0, 11, 15], [ANA, 9, 0, 11, 15]], 'paid', 'applecash', 37, 12],
+    ['Okafor', '12:30:00', 4, [ROSA, LUIS], [{ label: 'Deep clean', amount: 240 }, { label: 'Inside oven', amount: 25 }], [[ROSA, 12, 30, 16, 5], [LUIS, 12, 30, 16, 20]], 'reported', null, 40, 15]
   ];
-  // time clock: past days this week + Luis clocked in right now
-  const te = [];
-  for (let off = -dow; off < 0; off++) {
-    te.push({ id: uid(), business_id: BIZ, user_id: ANA, clock_in: at(off, 8, 2), clock_out: at(off, 15, 34), note: '', edited: false, created_at: at(off, 8) });
-    te.push({ id: uid(), business_id: BIZ, user_id: LUIS, clock_in: at(off, 9, 10), clock_out: at(off, 16, 5), note: '', edited: off === -1, created_at: at(off, 9) });
-  }
-  te.push({ id: uid(), business_id: BIZ, user_id: ANA, clock_in: at(0, 7, 55), clock_out: at(0, 11, 0) < new Date().toISOString() ? at(0, 11, 0) : null, note: '', edited: false, created_at: at(0, 7) });
-  te.push({ id: uid(), business_id: BIZ, user_id: LUIS, clock_in: ago(2.25), clock_out: null, note: '', edited: false, created_at: ago(2.25) });
+  const pastDays = []; for (let off = -dow; off < 0; off++) pastDays.push(off);
+  const extraJobs = [];
+  past.forEach((p, k) => {
+    if (!pastDays.length) return;
+    const off = pastDays[k % pastDays.length];
+    const job = j(off, p[1], p[0], p[2], p[3]); extraJobs.push(job);
+    p[5].forEach(w => work(job, w[0], w[1], w[2], w[3], w[4]));
+    bills.push(bill(p[0], off, p[4], p[6], { job_id: job.id, method: p[6] === 'paid' ? p[7] : null, reported_method: p[6] === 'reported' ? 'zelle' : null, tip: p[8], supplies: p[9],
+      opened_at: at(off, 18), reported_at: p[6] === 'reported' ? at(off, 19) : null, paid_at: p[6] === 'paid' ? at(off, 19) : null, sent_at: at(off, 17) }));
+  });
+  jobs.push(...extraJobs);
+  // Today: Patel done and paid, Johnsons done (no bill yet), Luis on his way to Gómez
+  work(jobs[0], ROSA, 8, 0, 10, 5); work(jobs[0], ANA, 8, 0, 10, 5);
+  bills.push(bill('Dr. Patel', 0, [{ label: 'Standard clean', amount: 165 }], 'paid', { tip: 25, method: 'venmo', supplies: 10, sent_at: ago(5), opened_at: ago(4.8), paid_at: ago(4.7), job_id: jobs[0].id }));
+  bills.push(bill('Chen', -10, [{ label: 'Cleaning – 2,900 sq ft', amount: 195 }], 'opened', { opened_at: at(-9, 9), reminders: [at(-4, 9)] }));
+  te.push({ id: uid(), business_id: BIZ, user_id: LUIS, job_id: jobs[2].id, clock_in: ago(1.25), clock_out: null, note: '', edited: false, created_at: ago(1.25) });
   return {
     businesses: [{ id: BIZ, name: 'Rosa’s Cleaning', join_code: 'ROSA24', phone: '(919) 555-0100', pay_instructions: 'Checks payable to Rosa Martínez',
       pay_venmo: 'rosas-cleaning', pay_cashapp: 'rosascleaning', pay_paypal: '', pay_zelle: '(919) 555-0100', pay_applecash: '(919) 555-0100',
@@ -72,7 +82,7 @@ function seed() {
       { user_id: LUIS, business_id: BIZ, name: 'Luis', role: 'crew', color: '#7C4DDB', phone: '(919) 555-0166', active: true, created_at: ago(700) }
     ],
     clients, jobs, bills, time_entries: te,
-    member_pay: [{ user_id: ANA, business_id: BIZ, hourly_rate: 18 }, { user_id: LUIS, business_id: BIZ, hourly_rate: 17 }]
+    member_pay: [{ user_id: ROSA, business_id: BIZ, hourly_rate: 25 }, { user_id: ANA, business_id: BIZ, hourly_rate: 18 }, { user_id: LUIS, business_id: BIZ, hourly_rate: 17 }]
   };
 }
 let db; try { db = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
@@ -154,7 +164,12 @@ async function rpc(name, a) {
   }
   if (name === 'clock_in') {
     if (db.time_entries.some(e => e.user_id === me && !e.clock_out)) return { data: null, error: { message: 'Already clocked in' } };
-    db.time_entries.push({ id: uid(), business_id: BIZ, user_id: me, clock_in: new Date().toISOString(), clock_out: null, note: '', edited: false });
+    db.time_entries.push({ id: uid(), business_id: BIZ, user_id: me, job_id: (a && a.p_job) || null, clock_in: new Date().toISOString(), clock_out: null, note: '', edited: false });
+    return done('ok');
+  }
+  if (name === 'switch_job') {
+    const e = db.time_entries.find(x => x.user_id === me && !x.clock_out); if (e) e.clock_out = new Date().toISOString();
+    db.time_entries.push({ id: uid(), business_id: BIZ, user_id: me, job_id: a.p_job || null, clock_in: new Date().toISOString(), clock_out: null, note: '', edited: false });
     return done('ok');
   }
   if (name === 'clock_out') {
