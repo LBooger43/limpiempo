@@ -170,6 +170,8 @@ function viewOnboard() {
   <div class="between"><h1 class="h" style="font-size:32px">${t('welcome')}</h1>${langSeg()}</div>
   <form data-form="start" class="card col" style="padding:18px">
     <h2 class="h" style="font-size:22px">${t('startBiz')}</h2><p class="muted small" style="margin:0">${t('startBizD')}</p>
+    <label class="f">${t('ownerCode')}<input class="in" id="ob_code" required autocomplete="off" autocapitalize="characters" placeholder="LIMPIO-XXXX-XXXX" style="text-transform:uppercase"></label>
+    <div class="muted small" style="margin-top:-6px">${t('ownerCodeD')}</div>
     <label class="f">${t('bizName')}<input class="in" id="ob_biz" required placeholder="Rosa’s Cleaning"></label>
     <label class="f">${t('yourName')}<input class="in" id="ob_name" required autocomplete="given-name"></label>
     <label class="f">${t('phone')}<input class="in" id="ob_phone" inputmode="tel" autocomplete="tel"></label>
@@ -782,8 +784,8 @@ async function submit(name) {
       return;
     }
     if (name === 'start') {
-      const { error } = await sb.rpc('create_business', { p_business: val('ob_biz'), p_name: val('ob_name'), p_phone: val('ob_phone') });
-      if (error) { toast(t('errGeneric')); return; } await loadMe(); return;
+      const { error } = await sb.rpc('create_business_v2', { p_code: val('ob_code'), p_business: val('ob_biz'), p_name: val('ob_name'), p_phone: val('ob_phone'), p_app: 'limpiempo' });
+      if (error) { toast(/BAD_CODE/.test(error.message) ? t('badOwnerCode') : t('errGeneric')); return; } await loadMe(); return;
     }
     if (name === 'join') {
       const { error } = await sb.rpc('join_business', { p_code: val('jn_code'), p_name: val('jn_name'), p_phone: val('jn_phone') });
@@ -828,7 +830,7 @@ function onInput(e) {
 document.addEventListener('input', onInput);
 document.addEventListener('change', e => { if (e.target.tagName === 'SELECT') onInput(e); });
 
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 async function checkVersion() {
   if (window.LIMPIEMPO_DEMO) return;
   try {
